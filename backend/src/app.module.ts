@@ -6,6 +6,8 @@ import { AppService } from './app.service';
 import { UserModule } from './user/user.module';
 import { UserEntity } from './user/user.entity';
 import { AuthModule } from './auth/auth.module';
+import { ProductModule } from './product/product.module';
+import { Product } from './product/product.entity';
 
 @Module({
   imports: [
@@ -20,12 +22,13 @@ import { AuthModule } from './auth/auth.module';
         username: configService.get<string>('DB_USER', 'postgres'),
         password: configService.get<string>('DB_PASSWORD', ''),
         database: configService.get<string>('DB_NAME', 'store'),
-        entities: [UserEntity],
+        entities: [UserEntity, Product],
         synchronize: configService.get<string>('NODE_ENV') !== 'production',
       }),
     }),
     UserModule,
     AuthModule,
+    ProductModule,
   ],
   controllers: [AppController],
   providers: [AppService],
