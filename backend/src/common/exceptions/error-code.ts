@@ -6,6 +6,7 @@ export enum ErrorCode {
   UNAUTHORIZED = 'UNAUTHORIZED',
   PRODUCT_NOT_FOUND = 'PRODUCT_NOT_FOUND',
   INSUFFICIENT_STOCK = 'INSUFFICIENT_STOCK',
+  CART_ITEM_NOT_FOUND = 'CART_ITEM_NOT_FOUND',
 }
 
 export const ErrorMessage: Record<ErrorCode, string> = {
@@ -16,4 +17,5 @@ export const ErrorMessage: Record<ErrorCode, string> = {
   [ErrorCode.UNAUTHORIZED]: '인증이 필요합니다.',
   [ErrorCode.PRODUCT_NOT_FOUND]: '존재하지 않는 상품입니다.',
   [ErrorCode.INSUFFICIENT_STOCK]: '재고가 부족합니다.',
+  [ErrorCode.CART_ITEM_NOT_FOUND]: '장바구니에 존재하지 않는 상품입니다.',
 };

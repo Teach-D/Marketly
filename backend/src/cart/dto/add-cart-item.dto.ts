@@ -1,0 +1,12 @@
+import { IsInt, IsNotEmpty, IsString, IsUUID, Min } from 'class-validator';
+
+export class AddCartItemDto {
+  @IsString()
+  @IsUUID()
+  @IsNotEmpty()
+  productId: string;
+
+  @IsInt()
+  @Min(1)
+  quantity: number;
+}

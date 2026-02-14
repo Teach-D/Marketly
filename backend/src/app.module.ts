@@ -8,6 +8,8 @@ import { UserEntity } from './user/user.entity';
 import { AuthModule } from './auth/auth.module';
 import { ProductModule } from './product/product.module';
 import { Product } from './product/product.entity';
+import { CartModule } from './cart/cart.module';
+import { CartItem } from './cart/cart-item.entity';
 
 @Module({
   imports: [
@@ -22,13 +24,14 @@ import { Product } from './product/product.entity';
         username: configService.get<string>('DB_USER', 'postgres'),
         password: configService.get<string>('DB_PASSWORD', ''),
         database: configService.get<string>('DB_NAME', 'store'),
-        entities: [UserEntity, Product],
+        entities: [UserEntity, Product, CartItem],
         synchronize: configService.get<string>('NODE_ENV') !== 'production',
       }),
     }),
     UserModule,
     AuthModule,
     ProductModule,
+    CartModule,
   ],
   controllers: [AppController],
   providers: [AppService],
