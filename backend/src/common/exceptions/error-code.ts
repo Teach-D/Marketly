@@ -11,6 +11,10 @@ export enum ErrorCode {
   ORDER_NOT_FOUND = 'ORDER_NOT_FOUND',
   ORDER_FORBIDDEN = 'ORDER_FORBIDDEN',
   ORDER_INVALID_STATUS = 'ORDER_INVALID_STATUS',
+  REVIEW_NOT_FOUND = 'REVIEW_NOT_FOUND',
+  REVIEW_FORBIDDEN = 'REVIEW_FORBIDDEN',
+  REVIEW_ALREADY_EXISTS = 'REVIEW_ALREADY_EXISTS',
+  REVIEW_PURCHASE_REQUIRED = 'REVIEW_PURCHASE_REQUIRED',
 }
 
 export const ErrorMessage: Record<ErrorCode, string> = {
@@ -26,4 +30,8 @@ export const ErrorMessage: Record<ErrorCode, string> = {
   [ErrorCode.ORDER_NOT_FOUND]: '존재하지 않는 주문입니다.',
   [ErrorCode.ORDER_FORBIDDEN]: '주문에 대한 접근 권한이 없습니다.',
   [ErrorCode.ORDER_INVALID_STATUS]: '현재 상태에서 허용되지 않는 상태 변경입니다.',
+  [ErrorCode.REVIEW_NOT_FOUND]: '존재하지 않는 리뷰입니다.',
+  [ErrorCode.REVIEW_FORBIDDEN]: '리뷰에 대한 접근 권한이 없습니다.',
+  [ErrorCode.REVIEW_ALREADY_EXISTS]: '이미 리뷰를 작성한 상품입니다.',
+  [ErrorCode.REVIEW_PURCHASE_REQUIRED]: '배송완료된 주문이 있어야 리뷰를 작성할 수 있습니다.',
 };

@@ -26,4 +26,14 @@ export class UserService {
   async updateRefreshToken(id: string, hashedToken: string | null): Promise<void> {
     await this.userRepository.update(id, { refreshToken: hashedToken });
   }
+
+  async findAll(page: number, limit: number) {
+    const [items, total] = await this.userRepository.findAndCount({
+      select: ['id', 'email', 'role', 'createdAt'],
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+    return { items, total, page, limit };
+  }
 }
