@@ -10,6 +10,9 @@ import { ProductModule } from './product/product.module';
 import { Product } from './product/product.entity';
 import { CartModule } from './cart/cart.module';
 import { CartItem } from './cart/cart-item.entity';
+import { OrderModule } from './order/order.module';
+import { Order } from './order/order.entity';
+import { OrderItem } from './order/order-item.entity';
 
 @Module({
   imports: [
@@ -24,7 +27,7 @@ import { CartItem } from './cart/cart-item.entity';
         username: configService.get<string>('DB_USER', 'postgres'),
         password: configService.get<string>('DB_PASSWORD', ''),
         database: configService.get<string>('DB_NAME', 'store'),
-        entities: [UserEntity, Product, CartItem],
+        entities: [UserEntity, Product, CartItem, Order, OrderItem],
         synchronize: configService.get<string>('NODE_ENV') !== 'production',
       }),
     }),
@@ -32,6 +35,7 @@ import { CartItem } from './cart/cart-item.entity';
     AuthModule,
     ProductModule,
     CartModule,
+    OrderModule,
   ],
   controllers: [AppController],
   providers: [AppService],
