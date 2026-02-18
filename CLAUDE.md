@@ -65,7 +65,7 @@ store-nestjs/
 - type: feat, fix, docs, refactor, chore, test, style
 - 예: `feat: 룰렛 확률 계산 로직 추가`
 
-### 자동 커밋
+### 자동 git add
 - 작업 완료 후 항상 관련 파일을 `git add`한다.
 
 ### 주석
