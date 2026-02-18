@@ -1,4 +1,88 @@
 ---
+name: frontend
+description: React + TypeScript 프론트엔드 개발 규칙 스킬. 컴포넌트 구조, 상태 관리, API 연동, 라우팅, 에러 처리 규칙을 포함한다.
+---
+
+# Frontend Rules
+
+React + TypeScript 프론트엔드 코드 작성 시 아래 규칙을 적용한다.
+
+## 기술 스택
+
+- React + TypeScript
+- Vite
+- React Router v6
+- React Query (TanStack Query)
+- Zustand
+- Axios
+
+## 디렉토리 구조
+
+```
+frontend/src/
+  pages/         — 라우트 단위 페이지 컴포넌트
+  components/    — 재사용 가능한 UI 컴포넌트
+  hooks/         — 커스텀 훅 (비즈니스 로직)
+  api/           — Axios 호출 함수 + React Query 훅
+  store/         — Zustand 전역 상태
+```
+
+## 컴포넌트 규칙
+
+- 파일명: PascalCase (`ProductCard.tsx`)
+- 단일 책임 원칙 — 하나의 컴포넌트는 하나의 역할
+- 컴포넌트에 API 호출 직접 금지 → `hooks/` 또는 `api/`로 분리
+
+```tsx
+// pages/ProductsPage.tsx
+export default function ProductsPage() {
+  const { products, isLoading } = useProducts();
+  if (isLoading) return <Spinner />;
+  return <ProductList products={products} />;
+}
+```
+
+## 상태 관리 원칙
+
+| 상태 종류 | 도구 |
+|---------|------|
+| 서버 데이터 (목록, 상세) | React Query |
+| 전역 UI 상태 (인증, 장바구니 수) | Zustand |
+| 로컬 상태 (폼, 토글) | useState / useReducer |
+
+## API 호출 규칙
+
+- Axios 인스턴스는 `api/axios.ts`에서 공통 설정 (baseURL, interceptor)
+- 도메인별 API 함수 + React Query 훅을 같은 파일에 작성
+
+```typescript
+// api/product.api.ts
+export const fetchProducts = (query: ProductQuery) =>
+  axios.get<Product[]>('/products', { params: query }).then(r => r.data);
+
+export const useProducts = (query: ProductQuery) =>
+  useQuery({ queryKey: ['products', query], queryFn: () => fetchProducts(query) });
+```
+
+## 에러 처리
+
+- API 에러: React Query `onError` + 공통 에러 핸들러
+- UI 에러: Error Boundary
+- 사용자 피드백: toast 알림
+
+## 라우팅
+
+- React Router v6 `createBrowserRouter` 사용
+- 인증 필요 페이지는 `PrivateRoute`로 감싸기
+
+## 제약 사항
+
+- `any` 타입 금지
+- 인라인 스타일 지양 (CSS 모듈 또는 Tailwind 사용)
+- 전역 상태 남용 금지
+- 빈 catch 블록 금지
+
+---
 name: backend
 description: TypeScript + NestJS 백엔드 개발 규칙 스킬. 백엔드 코드를 작성, 수정, 생성할 때 자동으로 적용한다. 모듈 구조, 엔티티, DTO, 예외 처리, 인증, DB 마이그레이션, 테스트, API 문서화, 로깅, 트랜잭션 규칙을 포함한다.
 ---
