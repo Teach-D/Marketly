@@ -21,6 +21,15 @@ export const useOrder = (id: string) =>
     enabled: !!id,
   });
 
+export const useCancelOrder = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (orderId: string) =>
+      apiClient.patch<ApiResponse<Order>>(`/orders/${orderId}/cancel`).then((r) => r.data.data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['orders'] }),
+  });
+};
+
 export const useCreateOrder = () => {
   const queryClient = useQueryClient();
   return useMutation({
