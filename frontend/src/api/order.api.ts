@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import apiClient from './axios';
 import type { ApiResponse, Order } from '../types';
 
@@ -20,3 +20,15 @@ export const useOrder = (id: string) =>
         .then((r) => r.data.data),
     enabled: !!id,
   });
+
+export const useCreateOrder = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      apiClient.post<ApiResponse<Order>>('/orders').then((r) => r.data.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cart'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+    },
+  });
+};

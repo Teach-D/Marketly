@@ -5,6 +5,7 @@ import RegisterPage from './pages/RegisterPage';
 import MyPage from './pages/MyPage';
 import ProductsPage from './pages/ProductsPage';
 import ProductDetailPage from './pages/ProductDetailPage';
+import CartPage from './pages/CartPage';
 
 const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -13,7 +14,10 @@ const router = createBrowserRouter([
   { path: '/products/:id', element: <ProductDetailPage /> },
   {
     element: <PrivateRoute />,
-    children: [{ path: '/my', element: <MyPage /> }],
+    children: [
+      { path: '/my', element: <MyPage /> },
+      { path: '/cart', element: <CartPage /> },
+    ],
   },
   { path: '/', element: <ProductsPage /> },
 ]);

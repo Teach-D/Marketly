@@ -26,6 +26,13 @@ export interface ApiResponse<T> {
   error?: { code: string; message: string };
 }
 
+export interface CartItem {
+  id: string;
+  productId: string;
+  product: Product;
+  quantity: number;
+}
+
 export interface Product {
   id: string;
   name: string;
