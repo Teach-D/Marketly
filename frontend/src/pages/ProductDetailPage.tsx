@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useProduct } from '../api/product.api';
-import { useProductReviews } from '../api/review.api';
 import { useAddToCart } from '../api/cart.api';
 import { useAuthStore } from '../store/auth.store';
 import Spinner from '../components/common/Spinner';
+import ReviewSection from '../components/review/ReviewSection';
 
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -13,7 +13,6 @@ export default function ProductDetailPage() {
   const [quantity, setQuantity] = useState(1);
 
   const { data: product, isLoading } = useProduct(id ?? '');
-  const { data: reviewData } = useProductReviews(id ?? '');
   const { mutate: addToCart, isPending, isSuccess } = useAddToCart();
 
   if (isLoading) return <Spinner />;
@@ -59,26 +58,7 @@ export default function ProductDetailPage() {
       </section>
 
       <section style={sectionStyle}>
-        <h2 style={{ marginBottom: '1rem', fontSize: '1.1rem' }}>
-          리뷰 ({reviewData?.total ?? 0}개)
-        </h2>
-        {reviewData?.items.length === 0 ? (
-          <p style={{ color: '#6b7280' }}>아직 리뷰가 없습니다.</p>
-        ) : (
-          <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {reviewData?.items.map((review) => (
-              <li key={review.id} style={{ borderBottom: '1px solid #e5e7eb', paddingBottom: '0.75rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                  <span style={{ fontWeight: 600 }}>{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</span>
-                  <span style={{ fontSize: '0.8rem', color: '#9ca3af' }}>
-                    {review.user.email.split('@')[0]} · {new Date(review.createdAt).toLocaleDateString('ko-KR')}
-                  </span>
-                </div>
-                <p style={{ margin: 0, color: '#374151' }}>{review.content}</p>
-              </li>
-            ))}
-          </ul>
-        )}
+        <ReviewSection productId={product.id} />
       </section>
     </div>
   );
