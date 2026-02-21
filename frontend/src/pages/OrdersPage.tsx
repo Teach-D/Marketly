@@ -56,7 +56,7 @@ export default function OrdersPage() {
                 </span>
               </div>
               <p style={{ margin: '0 0 0.5rem', fontSize: '0.9rem', color: '#374151' }}>
-                {order.items.map((item) => item.product.name).join(', ')}
+                {order.items.map((item) => item.product?.name ?? '삭제된 상품').join(', ')}
               </p>
               <strong style={{ fontSize: '1rem' }}>{order.totalPrice.toLocaleString()}원</strong>
             </li>

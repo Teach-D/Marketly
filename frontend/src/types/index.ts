@@ -2,18 +2,20 @@ export interface User {
   id: string;
   email: string;
   role: 'USER' | 'ADMIN';
+  createdAt?: string;
 }
 
 export interface OrderItem {
   id: string;
-  productId: string;
-  product: { name: string; price: number };
+  productId: string | null;
+  product: { name: string; price: number } | null;
   quantity: number;
   price: number;
 }
 
 export interface Order {
   id: string;
+  userId: string;
   status: 'PAID' | 'SHIPPING' | 'DELIVERED' | 'CANCELLED';
   totalPrice: number;
   items: OrderItem[];

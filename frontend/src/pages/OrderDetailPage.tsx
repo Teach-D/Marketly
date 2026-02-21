@@ -59,7 +59,7 @@ export default function OrderDetailPage() {
             style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem 0', borderBottom: '1px solid #e5e7eb' }}
           >
             <div>
-              <p style={{ margin: 0, fontWeight: 600 }}>{item.product.name}</p>
+              <p style={{ margin: 0, fontWeight: 600 }}>{item.product?.name ?? '삭제된 상품'}</p>
               <p style={{ margin: '0.25rem 0 0', fontSize: '0.875rem', color: '#6b7280' }}>
                 {item.price.toLocaleString()}원 × {item.quantity}
               </p>
