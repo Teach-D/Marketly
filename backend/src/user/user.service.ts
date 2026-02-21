@@ -1,39 +1,36 @@
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { UserEntity } from './user.entity';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class UserService {
-  constructor(
-    @InjectRepository(UserEntity)
-    private readonly userRepository: Repository<UserEntity>,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  async findByEmail(email: string): Promise<UserEntity | null> {
-    return this.userRepository.findOne({ where: { email } });
+  async findByEmail(email: string) {
+    return this.prisma.user.findUnique({ where: { email } });
   }
 
-  async findById(id: string): Promise<UserEntity | null> {
-    return this.userRepository.findOne({ where: { id } });
+  async findById(id: string) {
+    return this.prisma.user.findUnique({ where: { id } });
   }
 
-  async create(email: string, hashedPassword: string): Promise<UserEntity> {
-    const user = this.userRepository.create({ email, password: hashedPassword });
-    return this.userRepository.save(user);
+  async create(email: string, hashedPassword: string) {
+    return this.prisma.user.create({ data: { email, password: hashedPassword } });
   }
 
-  async updateRefreshToken(id: string, hashedToken: string | null): Promise<void> {
-    await this.userRepository.update(id, { refreshToken: hashedToken });
+  async updateRefreshToken(id: string, hashedToken: string | null) {
+    await this.prisma.user.update({ where: { id }, data: { refreshToken: hashedToken } });
   }
 
   async findAll(page: number, limit: number) {
-    const [items, total] = await this.userRepository.findAndCount({
-      select: ['id', 'email', 'role', 'createdAt'],
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    const [items, total] = await Promise.all([
+      this.prisma.user.findMany({
+        select: { id: true, email: true, role: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.user.count(),
+    ]);
     return { items, total, page, limit };
   }
 }

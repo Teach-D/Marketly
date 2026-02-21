@@ -1,7 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { ILike, Repository } from 'typeorm';
-import { Product } from './product.entity';
+import { PrismaService } from '../prisma/prisma.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductQueryDto } from './dto/product-query.dto';
@@ -10,54 +8,54 @@ import { ErrorCode } from '../common/exceptions/error-code';
 
 @Injectable()
 export class ProductService {
-  constructor(
-    @InjectRepository(Product)
-    private readonly productRepository: Repository<Product>,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async findAll(query: ProductQueryDto) {
     const { page, limit, search } = query;
-    const where = search ? { name: ILike(`%${search}%`) } : {};
+    const where = {
+      deletedAt: null,
+      ...(search && { name: { contains: search } }),
+    };
 
-    const [items, total] = await this.productRepository.findAndCount({
-      where,
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    const [items, total] = await Promise.all([
+      this.prisma.product.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.product.count({ where }),
+    ]);
 
     return { items, total, page, limit };
   }
 
-  async findById(id: string): Promise<Product> {
-    const product = await this.productRepository.findOne({ where: { id } });
+  async findById(id: string) {
+    const product = await this.prisma.product.findFirst({ where: { id, deletedAt: null } });
     if (!product) throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND, HttpStatus.NOT_FOUND);
     return product;
   }
 
-  async create(dto: CreateProductDto): Promise<Product> {
-    const product = this.productRepository.create(dto);
-    return this.productRepository.save(product);
+  async create(dto: CreateProductDto) {
+    return this.prisma.product.create({ data: dto });
   }
 
-  async update(id: string, dto: UpdateProductDto): Promise<Product> {
-    const product = await this.findById(id);
-    Object.assign(product, dto);
-    return this.productRepository.save(product);
-  }
-
-  async remove(id: string): Promise<void> {
+  async update(id: string, dto: UpdateProductDto) {
     await this.findById(id);
-    await this.productRepository.softDelete(id);
+    return this.prisma.product.update({ where: { id }, data: dto });
   }
 
-  async adjustStock(id: string, delta: number): Promise<Product> {
+  async remove(id: string) {
+    await this.findById(id);
+    await this.prisma.product.update({ where: { id }, data: { deletedAt: new Date() } });
+  }
+
+  async adjustStock(id: string, delta: number) {
     const product = await this.findById(id);
     const newStock = product.stock + delta;
     if (newStock < 0) {
       throw new BusinessException(ErrorCode.INSUFFICIENT_STOCK, HttpStatus.CONFLICT);
     }
-    product.stock = newStock;
-    return this.productRepository.save(product);
+    return this.prisma.product.update({ where: { id }, data: { stock: newStock } });
   }
 }

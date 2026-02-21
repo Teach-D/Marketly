@@ -1,12 +1,7 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
-import { Order } from './order.entity';
-import { OrderItem } from './order-item.entity';
+import { PrismaService } from '../prisma/prisma.service';
 import { OrderStatus, VALID_TRANSITIONS } from './enums/order-status.enum';
 import { CartService } from '../cart/cart.service';
-import { CartItem } from '../cart/cart-item.entity';
-import { Product } from '../product/product.entity';
 import { Role } from '../common/enums/role.enum';
 import { BusinessException } from '../common/exceptions/business.exception';
 import { ErrorCode } from '../common/exceptions/error-code';
@@ -14,13 +9,11 @@ import { ErrorCode } from '../common/exceptions/error-code';
 @Injectable()
 export class OrderService {
   constructor(
-    @InjectRepository(Order)
-    private readonly orderRepository: Repository<Order>,
+    private readonly prisma: PrismaService,
     private readonly cartService: CartService,
-    private readonly dataSource: DataSource,
   ) {}
 
-  async createFromCart(userId: string): Promise<Order> {
+  async createFromCart(userId: string) {
     const cartItems = await this.cartService.findMyCart(userId);
     if (!cartItems.length) {
       throw new BusinessException(ErrorCode.CART_EMPTY, HttpStatus.BAD_REQUEST);
@@ -34,45 +27,55 @@ export class OrderService {
 
     const totalPrice = cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
 
-    return this.dataSource.transaction(async (manager) => {
-      const order = manager.create(Order, { userId, totalPrice, status: OrderStatus.PAID });
-      const savedOrder = await manager.save(order);
+    return this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.create({
+        data: {
+          userId,
+          totalPrice,
+          status: OrderStatus.PAID,
+          items: {
+            create: cartItems.map((item) => ({
+              productId: item.productId,
+              quantity: item.quantity,
+              price: item.product.price,
+            })),
+          },
+        },
+        include: { items: { include: { product: true } } },
+      });
 
       for (const cartItem of cartItems) {
-        const orderItem = manager.create(OrderItem, {
-          orderId: savedOrder.id,
-          productId: cartItem.productId,
-          quantity: cartItem.quantity,
-          price: cartItem.product.price,
+        await tx.product.update({
+          where: { id: cartItem.productId },
+          data: { stock: { decrement: cartItem.quantity } },
         });
-        await manager.save(orderItem);
-        await manager.decrement(Product, { id: cartItem.productId }, 'stock', cartItem.quantity);
       }
 
-      await manager.delete(CartItem, { userId });
-      return savedOrder;
+      await tx.cartItem.deleteMany({ where: { userId } });
+
+      return order;
     });
   }
 
-  async findMyOrders(userId: string): Promise<Order[]> {
-    return this.orderRepository.find({
+  async findMyOrders(userId: string) {
+    return this.prisma.order.findMany({
       where: { userId },
-      relations: ['items', 'items.product'],
-      order: { createdAt: 'DESC' },
+      include: { items: { include: { product: true } } },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
-  async findAllOrders(): Promise<Order[]> {
-    return this.orderRepository.find({
-      relations: ['items', 'items.product'],
-      order: { createdAt: 'DESC' },
+  async findAllOrders() {
+    return this.prisma.order.findMany({
+      include: { items: { include: { product: true } } },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
-  async findById(orderId: string, userId: string, role: Role): Promise<Order> {
-    const order = await this.orderRepository.findOne({
+  async findById(orderId: string, userId: string, role: Role) {
+    const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      relations: ['items', 'items.product'],
+      include: { items: { include: { product: true } } },
     });
     if (!order) throw new BusinessException(ErrorCode.ORDER_NOT_FOUND, HttpStatus.NOT_FOUND);
     if (role !== Role.ADMIN && order.userId !== userId) {
@@ -81,30 +84,37 @@ export class OrderService {
     return order;
   }
 
-  async cancel(orderId: string, userId: string, role: Role): Promise<Order> {
+  async cancel(orderId: string, userId: string, role: Role) {
     const order = await this.findById(orderId, userId, role);
     this.assertTransition(order.status, OrderStatus.CANCELLED);
-    order.status = OrderStatus.CANCELLED;
-    return this.orderRepository.save(order);
+    return this.prisma.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.CANCELLED },
+      include: { items: { include: { product: true } } },
+    });
   }
 
-  async ship(orderId: string): Promise<Order> {
-    const order = await this.orderRepository.findOne({ where: { id: orderId } });
+  async ship(orderId: string) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
     if (!order) throw new BusinessException(ErrorCode.ORDER_NOT_FOUND, HttpStatus.NOT_FOUND);
     this.assertTransition(order.status, OrderStatus.SHIPPING);
-    order.status = OrderStatus.SHIPPING;
-    return this.orderRepository.save(order);
+    return this.prisma.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.SHIPPING },
+    });
   }
 
-  async deliver(orderId: string): Promise<Order> {
-    const order = await this.orderRepository.findOne({ where: { id: orderId } });
+  async deliver(orderId: string) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
     if (!order) throw new BusinessException(ErrorCode.ORDER_NOT_FOUND, HttpStatus.NOT_FOUND);
     this.assertTransition(order.status, OrderStatus.DELIVERED);
-    order.status = OrderStatus.DELIVERED;
-    return this.orderRepository.save(order);
+    return this.prisma.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.DELIVERED },
+    });
   }
 
-  private assertTransition(current: OrderStatus, next: OrderStatus): void {
+  private assertTransition(current: OrderStatus, next: OrderStatus) {
     if (!VALID_TRANSITIONS[current].includes(next)) {
       throw new BusinessException(ErrorCode.ORDER_INVALID_STATUS, HttpStatus.CONFLICT);
     }

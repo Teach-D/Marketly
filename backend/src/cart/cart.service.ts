@@ -1,7 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { CartItem } from './cart-item.entity';
+import { PrismaService } from '../prisma/prisma.service';
 import { AddCartItemDto } from './dto/add-cart-item.dto';
 import { UpdateCartItemDto } from './dto/update-cart-item.dto';
 import { ProductService } from '../product/product.service';
@@ -11,58 +9,49 @@ import { ErrorCode } from '../common/exceptions/error-code';
 @Injectable()
 export class CartService {
   constructor(
-    @InjectRepository(CartItem)
-    private readonly cartItemRepository: Repository<CartItem>,
+    private readonly prisma: PrismaService,
     private readonly productService: ProductService,
   ) {}
 
-  async findMyCart(userId: string): Promise<CartItem[]> {
-    return this.cartItemRepository.find({
+  async findMyCart(userId: string) {
+    return this.prisma.cartItem.findMany({
       where: { userId },
-      relations: ['product'],
-      order: { createdAt: 'DESC' },
+      include: { product: true },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
-  async addItem(userId: string, dto: AddCartItemDto): Promise<CartItem> {
+  async addItem(userId: string, dto: AddCartItemDto) {
     await this.productService.findById(dto.productId);
 
-    const existing = await this.cartItemRepository.findOne({
-      where: { userId, productId: dto.productId },
+    return this.prisma.cartItem.upsert({
+      where: { userId_productId: { userId, productId: dto.productId } },
+      update: { quantity: { increment: dto.quantity } },
+      create: { userId, productId: dto.productId, quantity: dto.quantity },
+      include: { product: true },
     });
-
-    if (existing) {
-      existing.quantity += dto.quantity;
-      return this.cartItemRepository.save(existing);
-    }
-
-    const item = this.cartItemRepository.create({
-      userId,
-      productId: dto.productId,
-      quantity: dto.quantity,
-    });
-    return this.cartItemRepository.save(item);
   }
 
-  async updateQuantity(userId: string, itemId: string, dto: UpdateCartItemDto): Promise<CartItem> {
-    const item = await this.findMyItem(userId, itemId);
-    item.quantity = dto.quantity;
-    return this.cartItemRepository.save(item);
-  }
-
-  async removeItem(userId: string, itemId: string): Promise<void> {
+  async updateQuantity(userId: string, itemId: string, dto: UpdateCartItemDto) {
     await this.findMyItem(userId, itemId);
-    await this.cartItemRepository.delete(itemId);
-  }
-
-  async clearCart(userId: string): Promise<void> {
-    await this.cartItemRepository.delete({ userId });
-  }
-
-  private async findMyItem(userId: string, itemId: string): Promise<CartItem> {
-    const item = await this.cartItemRepository.findOne({
-      where: { id: itemId, userId },
+    return this.prisma.cartItem.update({
+      where: { id: itemId },
+      data: { quantity: dto.quantity },
+      include: { product: true },
     });
+  }
+
+  async removeItem(userId: string, itemId: string) {
+    await this.findMyItem(userId, itemId);
+    await this.prisma.cartItem.delete({ where: { id: itemId } });
+  }
+
+  async clearCart(userId: string) {
+    await this.prisma.cartItem.deleteMany({ where: { userId } });
+  }
+
+  private async findMyItem(userId: string, itemId: string) {
+    const item = await this.prisma.cartItem.findFirst({ where: { id: itemId, userId } });
     if (!item) throw new BusinessException(ErrorCode.CART_ITEM_NOT_FOUND, HttpStatus.NOT_FOUND);
     return item;
   }
