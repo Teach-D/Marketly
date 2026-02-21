@@ -12,7 +12,11 @@
       "Bash(node -e \"console.log\\(''hello''\\)\")",
       "Bash(node -e \":*)",
       "Bash(npx tsc:*)",
-      "Bash(npx jest:*)"
+      "Bash(npx jest:*)",
+      "Bash(npx prisma:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(cd:*)",
+      "Bash(xargs grep:*)"
     ]
   }
 }
