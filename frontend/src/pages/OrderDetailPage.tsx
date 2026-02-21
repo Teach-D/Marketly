@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useOrder, useCancelOrder } from '../api/order.api';
 import Spinner from '../components/common/Spinner';
+import { useToastStore } from '../store/toast.store';
 import type { Order } from '../types';
 
 const statusLabel: Record<Order['status'], string> = {
@@ -22,12 +23,13 @@ export default function OrderDetailPage() {
   const navigate = useNavigate();
   const { data: order, isLoading } = useOrder(id ?? '');
   const { mutate: cancelOrder, isPending: isCancelling } = useCancelOrder();
+  const toast = useToastStore();
 
   const handleCancel = () => {
     if (!order || !confirm('주문을 취소하시겠습니까?')) return;
     cancelOrder(order.id, {
-      onSuccess: () => navigate('/orders'),
-      onError: () => alert('주문 취소에 실패했습니다.'),
+      onSuccess: () => { toast.push('주문이 취소되었습니다.', 'info'); navigate('/orders'); },
+      onError: () => toast.push('주문 취소에 실패했습니다.', 'error'),
     });
   };
 

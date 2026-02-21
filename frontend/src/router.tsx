@@ -1,7 +1,9 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
+import AppLayout from './components/common/AppLayout';
 import PrivateRoute from './components/common/PrivateRoute';
 import AdminRoute from './components/common/AdminRoute';
 import AdminLayout from './components/admin/AdminLayout';
+import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import MyPage from './pages/MyPage';
@@ -15,17 +17,23 @@ import AdminOrdersPage from './pages/admin/AdminOrdersPage';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
 
 const router = createBrowserRouter([
-  { path: '/login', element: <LoginPage /> },
-  { path: '/register', element: <RegisterPage /> },
-  { path: '/products', element: <ProductsPage /> },
-  { path: '/products/:id', element: <ProductDetailPage /> },
   {
-    element: <PrivateRoute />,
+    element: <AppLayout />,
     children: [
-      { path: '/my', element: <MyPage /> },
-      { path: '/cart', element: <CartPage /> },
-      { path: '/orders', element: <OrdersPage /> },
-      { path: '/orders/:id', element: <OrderDetailPage /> },
+      { path: '/', element: <HomePage /> },
+      { path: '/products', element: <ProductsPage /> },
+      { path: '/products/:id', element: <ProductDetailPage /> },
+      { path: '/login', element: <LoginPage /> },
+      { path: '/register', element: <RegisterPage /> },
+      {
+        element: <PrivateRoute />,
+        children: [
+          { path: '/my', element: <MyPage /> },
+          { path: '/cart', element: <CartPage /> },
+          { path: '/orders', element: <OrdersPage /> },
+          { path: '/orders/:id', element: <OrderDetailPage /> },
+        ],
+      },
     ],
   },
   {
@@ -42,7 +50,6 @@ const router = createBrowserRouter([
       },
     ],
   },
-  { path: '/', element: <ProductsPage /> },
 ]);
 
 export default router;

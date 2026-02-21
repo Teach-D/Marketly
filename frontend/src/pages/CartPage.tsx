@@ -3,18 +3,20 @@ import { useCart } from '../api/cart.api';
 import { useCreateOrder } from '../api/order.api';
 import CartItemRow from '../components/cart/CartItemRow';
 import Spinner from '../components/common/Spinner';
+import { useToastStore } from '../store/toast.store';
 
 export default function CartPage() {
   const navigate = useNavigate();
   const { data: items, isLoading } = useCart();
   const { mutate: createOrder, isPending: isOrdering } = useCreateOrder();
+  const toast = useToastStore();
 
   const totalPrice = items?.reduce((sum, item) => sum + item.product.price * item.quantity, 0) ?? 0;
 
   const handleOrder = () => {
     createOrder(undefined, {
-      onSuccess: () => navigate('/my'),
-      onError: () => alert('주문에 실패했습니다. 재고를 확인해 주세요.'),
+      onSuccess: () => navigate('/orders'),
+      onError: () => toast.push('주문에 실패했습니다. 재고를 확인해 주세요.', 'error'),
     });
   };
 

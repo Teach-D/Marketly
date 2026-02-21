@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import apiClient from './axios';
+import { useAuthStore } from '../store/auth.store';
 import type { ApiResponse, CartItem } from '../types';
 
 interface AddCartItemDto {
@@ -7,12 +8,15 @@ interface AddCartItemDto {
   quantity: number;
 }
 
-export const useCart = () =>
-  useQuery({
+export const useCart = () => {
+  const { accessToken } = useAuthStore();
+  return useQuery({
     queryKey: ['cart'],
+    enabled: !!accessToken,
     queryFn: () =>
       apiClient.get<ApiResponse<CartItem[]>>('/carts').then((r) => r.data.data),
   });
+};
 
 export const useAddToCart = () => {
   const queryClient = useQueryClient();
