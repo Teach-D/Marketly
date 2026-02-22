@@ -42,7 +42,7 @@ export class AuthService {
       throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, HttpStatus.UNAUTHORIZED);
     }
 
-    const tokens = await this.issueTokens({ sub: user.id, email: user.email });
+    const tokens = await this.issueTokens({ sub: user.id, email: user.email, role: user.role });
     const hashedRefresh = await bcrypt.hash(tokens.refreshToken, SALT_ROUNDS);
     await this.userService.updateRefreshToken(user.id, hashedRefresh);
 
@@ -64,7 +64,7 @@ export class AuthService {
       throw new BusinessException(ErrorCode.INVALID_TOKEN, HttpStatus.UNAUTHORIZED);
     }
 
-    const tokens = await this.issueTokens({ sub: userId, email });
+    const tokens = await this.issueTokens({ sub: userId, email, role: user.role });
     const hashedRefresh = await bcrypt.hash(tokens.refreshToken, SALT_ROUNDS);
     await this.userService.updateRefreshToken(userId, hashedRefresh);
 

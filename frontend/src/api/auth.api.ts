@@ -19,7 +19,7 @@ function decodeToken(token: string): User {
     email: string;
     role: 'USER' | 'ADMIN';
   };
-  return { id: payload.sub, email: payload.email, role: payload.role };
+  return { id: payload.sub, email: payload.email, role: payload.role ?? 'USER' };
 }
 
 export const useLogin = () => {
