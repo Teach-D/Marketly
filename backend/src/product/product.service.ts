@@ -1,17 +1,37 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { RedisService } from '../redis/redis.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductQueryDto } from './dto/product-query.dto';
 import { BusinessException } from '../common/exceptions/business.exception';
 import { ErrorCode } from '../common/exceptions/error-code';
+import type { Product } from '@prisma/client';
+
+const PRODUCT_DETAIL_TTL = 300;
+const PRODUCT_LIST_TTL = 60;
+
+export interface ProductListResult {
+  items: Product[];
+  total: number;
+  page: number;
+  limit: number;
+}
 
 @Injectable()
 export class ProductService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly redis: RedisService,
+  ) {}
 
   async findAll(query: ProductQueryDto) {
     const { page, limit, search } = query;
+    const cacheKey = `products:list:${page}:${limit}:${search ?? ''}`;
+
+    const cached = await this.redis.get<ProductListResult>(cacheKey);
+    if (cached) return cached;
+
     const where = {
       deletedAt: null,
       ...(search && { name: { contains: search } }),
@@ -27,27 +47,41 @@ export class ProductService {
       this.prisma.product.count({ where }),
     ]);
 
-    return { items, total, page, limit };
+    const result = { items, total, page, limit };
+    await this.redis.set(cacheKey, result, PRODUCT_LIST_TTL);
+    return result;
   }
 
   async findById(id: string) {
+    const cacheKey = `product:${id}`;
+
+    const cached = await this.redis.get<Product>(cacheKey);
+    if (cached) return cached;
+
     const product = await this.prisma.product.findFirst({ where: { id, deletedAt: null } });
     if (!product) throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND, HttpStatus.NOT_FOUND);
+
+    await this.redis.set(cacheKey, product, PRODUCT_DETAIL_TTL);
     return product;
   }
 
   async create(dto: CreateProductDto) {
-    return this.prisma.product.create({ data: dto });
+    const product = await this.prisma.product.create({ data: dto });
+    await this.redis.delByPattern('products:list:*');
+    return product;
   }
 
   async update(id: string, dto: UpdateProductDto) {
     await this.findById(id);
-    return this.prisma.product.update({ where: { id }, data: dto });
+    const product = await this.prisma.product.update({ where: { id }, data: dto });
+    await this.invalidateProduct(id);
+    return product;
   }
 
   async remove(id: string) {
     await this.findById(id);
     await this.prisma.product.update({ where: { id }, data: { deletedAt: new Date() } });
+    await this.invalidateProduct(id);
   }
 
   async adjustStock(id: string, delta: number) {
@@ -56,6 +90,15 @@ export class ProductService {
     if (newStock < 0) {
       throw new BusinessException(ErrorCode.INSUFFICIENT_STOCK, HttpStatus.CONFLICT);
     }
-    return this.prisma.product.update({ where: { id }, data: { stock: newStock } });
+    const updated = await this.prisma.product.update({ where: { id }, data: { stock: newStock } });
+    await this.invalidateProduct(id);
+    return updated;
+  }
+
+  private async invalidateProduct(id: string): Promise<void> {
+    await Promise.all([
+      this.redis.del(`product:${id}`),
+      this.redis.delByPattern('products:list:*'),
+    ]);
   }
 }
