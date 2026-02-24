@@ -1,6 +1,8 @@
-import { IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+
+export type ProductSortBy = 'createdAt' | 'salesCount';
 
 export class ProductQueryDto {
   @ApiPropertyOptional({ example: 1, description: '페이지 번호', default: 1 })
@@ -21,4 +23,9 @@ export class ProductQueryDto {
   @IsString()
   @IsOptional()
   search?: string;
+
+  @ApiPropertyOptional({ enum: ['createdAt', 'salesCount'], default: 'createdAt', description: '정렬 기준' })
+  @IsEnum(['createdAt', 'salesCount'])
+  @IsOptional()
+  sortBy: ProductSortBy = 'createdAt';
 }

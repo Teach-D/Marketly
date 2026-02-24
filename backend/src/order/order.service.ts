@@ -47,7 +47,10 @@ export class OrderService {
       for (const cartItem of cartItems) {
         await tx.product.update({
           where: { id: cartItem.productId },
-          data: { stock: { decrement: cartItem.quantity } },
+          data: {
+            stock: { decrement: cartItem.quantity },
+            salesCount: { increment: cartItem.quantity },
+          },
         });
       }
 
@@ -87,10 +90,25 @@ export class OrderService {
   async cancel(orderId: string, userId: string, role: Role) {
     const order = await this.findById(orderId, userId, role);
     this.assertTransition(order.status, OrderStatus.CANCELLED);
-    return this.prisma.order.update({
-      where: { id: orderId },
-      data: { status: OrderStatus.CANCELLED },
-      include: { items: { include: { product: true } } },
+
+    return this.prisma.$transaction(async (tx) => {
+      for (const item of order.items) {
+        if (item.productId) {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: {
+              stock: { increment: item.quantity },
+              salesCount: { decrement: item.quantity },
+            },
+          });
+        }
+      }
+
+      return tx.order.update({
+        where: { id: orderId },
+        data: { status: OrderStatus.CANCELLED },
+        include: { items: { include: { product: true } } },
+      });
     });
   }
 

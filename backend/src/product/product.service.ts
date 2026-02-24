@@ -26,8 +26,8 @@ export class ProductService {
   ) {}
 
   async findAll(query: ProductQueryDto) {
-    const { page, limit, search } = query;
-    const cacheKey = `products:list:${page}:${limit}:${search ?? ''}`;
+    const { page, limit, search, sortBy } = query;
+    const cacheKey = `products:list:${page}:${limit}:${search ?? ''}:${sortBy}`;
 
     const cached = await this.redis.get<ProductListResult>(cacheKey);
     if (cached) return cached;
@@ -40,7 +40,7 @@ export class ProductService {
     const [items, total] = await Promise.all([
       this.prisma.product.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { [sortBy]: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
       }),
