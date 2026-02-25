@@ -35,6 +35,7 @@ model Product {
   cartItems   CartItem[]
   orderItems  OrderItem[]
   reviews     Review[]
+  stat        ProductStat?
 
   @@index([deletedAt, salesCount])
   @@index([deletedAt, createdAt])
@@ -102,6 +103,15 @@ model Review {
   @@unique([userId, productId])
   @@index([productId, createdAt])
   @@map("review")
+}
+
+model ProductStat {
+  productId   String  @id @map("product_id")
+  reviewCount Int     @default(0) @map("review_count")
+  avgRating   Float   @default(0) @map("avg_rating")
+  product     Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("product_stat")
 }
 
 enum Role {

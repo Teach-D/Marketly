@@ -6,13 +6,15 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductQueryDto } from './dto/product-query.dto';
 import { BusinessException } from '../common/exceptions/business.exception';
 import { ErrorCode } from '../common/exceptions/error-code';
-import type { Product } from '@prisma/client';
+import type { Product, ProductStat } from '@prisma/client';
+
+export type ProductWithStat = Product & { stat: ProductStat | null };
 
 const PRODUCT_DETAIL_TTL = 300;
 const PRODUCT_LIST_TTL = 60;
 
 export interface ProductListResult {
-  items: Product[];
+  items: ProductWithStat[];
   total: number;
   page: number;
   limit: number;
@@ -26,8 +28,8 @@ export class ProductService {
   ) {}
 
   async findAll(query: ProductQueryDto) {
-    const { page, limit, search, sortBy } = query;
-    const cacheKey = `products:list:${page}:${limit}:${search ?? ''}:${sortBy}`;
+    const { page, limit, search, sortBy, minRating } = query;
+    const cacheKey = `products:list:${page}:${limit}:${search ?? ''}:${sortBy}:${minRating ?? ''}`;
 
     const cached = await this.redis.get<ProductListResult>(cacheKey);
     if (cached) return cached;
@@ -35,11 +37,13 @@ export class ProductService {
     const where = {
       deletedAt: null,
       ...(search && { name: { contains: search } }),
+      ...(minRating !== undefined && { stat: { avgRating: { gte: minRating } } }),
     };
 
     const [items, total] = await Promise.all([
       this.prisma.product.findMany({
         where,
+        include: { stat: true },
         orderBy: { [sortBy]: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
@@ -55,10 +59,13 @@ export class ProductService {
   async findById(id: string) {
     const cacheKey = `product:${id}`;
 
-    const cached = await this.redis.get<Product>(cacheKey);
+    const cached = await this.redis.get<ProductWithStat>(cacheKey);
     if (cached) return cached;
 
-    const product = await this.prisma.product.findFirst({ where: { id, deletedAt: null } });
+    const product = await this.prisma.product.findFirst({
+      where: { id, deletedAt: null },
+      include: { stat: true },
+    });
     if (!product) throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND, HttpStatus.NOT_FOUND);
 
     await this.redis.set(cacheKey, product, PRODUCT_DETAIL_TTL);
@@ -66,7 +73,13 @@ export class ProductService {
   }
 
   async create(dto: CreateProductDto) {
-    const product = await this.prisma.product.create({ data: dto });
+    const product = await this.prisma.product.create({
+      data: {
+        ...dto,
+        stat: { create: {} },
+      },
+      include: { stat: true },
+    });
     await this.redis.delByPattern('products:list:*');
     return product;
   }

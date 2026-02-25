@@ -36,17 +36,22 @@ export class ReviewService {
       throw new BusinessException(ErrorCode.REVIEW_ALREADY_EXISTS, HttpStatus.CONFLICT);
     }
 
-    return this.prisma.review.create({ data: { userId, ...dto } });
+    const review = await this.prisma.review.create({ data: { userId, ...dto } });
+    await this.refreshProductStat(dto.productId);
+    return review;
   }
 
   async update(userId: string, reviewId: string, dto: UpdateReviewDto) {
-    await this.findMyReview(userId, reviewId);
-    return this.prisma.review.update({ where: { id: reviewId }, data: dto });
+    const review = await this.findMyReview(userId, reviewId);
+    const updated = await this.prisma.review.update({ where: { id: reviewId }, data: dto });
+    await this.refreshProductStat(review.productId);
+    return updated;
   }
 
   async remove(userId: string, reviewId: string) {
-    await this.findMyReview(userId, reviewId);
+    const review = await this.findMyReview(userId, reviewId);
     await this.prisma.review.delete({ where: { id: reviewId } });
+    await this.refreshProductStat(review.productId);
   }
 
   private async assertPurchased(userId: string, productId: string) {
@@ -59,6 +64,19 @@ export class ReviewService {
     if (!purchased) {
       throw new BusinessException(ErrorCode.REVIEW_PURCHASE_REQUIRED, HttpStatus.FORBIDDEN);
     }
+  }
+
+  private async refreshProductStat(productId: string): Promise<void> {
+    const result = await this.prisma.review.aggregate({
+      where: { productId },
+      _count: { id: true },
+      _avg: { rating: true },
+    });
+    await this.prisma.productStat.upsert({
+      where: { productId },
+      create: { productId, reviewCount: result._count.id, avgRating: result._avg.rating ?? 0 },
+      update: { reviewCount: result._count.id, avgRating: result._avg.rating ?? 0 },
+    });
   }
 
   private async findMyReview(userId: string, reviewId: string) {
