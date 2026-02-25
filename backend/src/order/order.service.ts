@@ -1,15 +1,18 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { RedisService } from '../redis/redis.service';
 import { OrderStatus, VALID_TRANSITIONS } from './enums/order-status.enum';
 import { CartService } from '../cart/cart.service';
 import { Role } from '../common/enums/role.enum';
 import { BusinessException } from '../common/exceptions/business.exception';
 import { ErrorCode } from '../common/exceptions/error-code';
+import { REDIS_KEYS } from '../common/constants/redis-keys';
 
 @Injectable()
 export class OrderService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly redis: RedisService,
     private readonly cartService: CartService,
   ) {}
 
@@ -27,7 +30,7 @@ export class OrderService {
 
     const totalPrice = cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const order = await tx.order.create({
         data: {
           userId,
@@ -58,6 +61,12 @@ export class OrderService {
 
       return order;
     });
+
+    for (const cartItem of cartItems) {
+      await this.redis.zIncrBy(REDIS_KEYS.SALES_RANKING, cartItem.quantity, cartItem.productId);
+    }
+
+    return result;
   }
 
   async findMyOrders(userId: string) {
@@ -91,7 +100,7 @@ export class OrderService {
     const order = await this.findById(orderId, userId, role);
     this.assertTransition(order.status, OrderStatus.CANCELLED);
 
-    return this.prisma.$transaction(async (tx) => {
+    const cancelled = await this.prisma.$transaction(async (tx) => {
       for (const item of order.items) {
         if (item.productId) {
           await tx.product.update({
@@ -110,6 +119,14 @@ export class OrderService {
         include: { items: { include: { product: true } } },
       });
     });
+
+    for (const item of order.items) {
+      if (item.productId) {
+        await this.redis.zIncrBy(REDIS_KEYS.SALES_RANKING, -item.quantity, item.productId);
+      }
+    }
+
+    return cancelled;
   }
 
   async ship(orderId: string) {

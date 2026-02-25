@@ -31,6 +31,24 @@ export class RedisService implements OnModuleDestroy {
     if (keys.length > 0) await this.client.del(...keys);
   }
 
+  async zIncrBy(key: string, increment: number, member: string): Promise<number> {
+    const result = await this.client.zincrby(key, increment, member);
+    return parseFloat(result);
+  }
+
+  async zRevRangeWithScores(
+    key: string,
+    start: number,
+    stop: number,
+  ): Promise<Array<{ member: string; score: number }>> {
+    const raw = await this.client.zrevrange(key, start, stop, 'WITHSCORES');
+    const entries: Array<{ member: string; score: number }> = [];
+    for (let i = 0; i < raw.length; i += 2) {
+      entries.push({ member: raw[i], score: parseFloat(raw[i + 1]) });
+    }
+    return entries;
+  }
+
   async delByPattern(pattern: string): Promise<void> {
     const keys = await this.scanKeys(pattern);
     if (keys.length > 0) await this.client.del(...keys);

@@ -6,6 +6,7 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductQueryDto } from './dto/product-query.dto';
 import { BusinessException } from '../common/exceptions/business.exception';
 import { ErrorCode } from '../common/exceptions/error-code';
+import { REDIS_KEYS } from '../common/constants/redis-keys';
 import type { Product, ProductStat } from '@prisma/client';
 
 export type ProductWithStat = Product & { stat: ProductStat | null };
@@ -106,6 +107,26 @@ export class ProductService {
     const updated = await this.prisma.product.update({ where: { id }, data: { stock: newStock } });
     await this.invalidateProduct(id);
     return updated;
+  }
+
+  async getTopRanking(limit: number) {
+    const entries = await this.redis.zRevRangeWithScores(REDIS_KEYS.SALES_RANKING, 0, limit - 1);
+    if (!entries.length) return [];
+
+    const ids = entries.map((e) => e.member);
+    const products = await this.prisma.product.findMany({
+      where: { id: { in: ids }, deletedAt: null },
+      include: { stat: true },
+    });
+
+    const productMap = new Map(products.map((p) => [p.id, p]));
+    return entries
+      .map((entry, index) => ({
+        rank: index + 1,
+        salesCount: entry.score,
+        product: productMap.get(entry.member) ?? null,
+      }))
+      .filter((item) => item.product !== null);
   }
 
   private async invalidateProduct(id: string): Promise<void> {

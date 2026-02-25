@@ -1,11 +1,13 @@
 import {
   Body,
   Controller,
+  DefaultValuePipe,
   Delete,
   Get,
   HttpCode,
   HttpStatus,
   Param,
+  ParseIntPipe,
   Patch,
   Post,
   Query,
@@ -29,6 +31,17 @@ export class ProductController {
   @ApiResponse({ status: 200, description: '상품 목록 반환' })
   async findAll(@Query() query: ProductQueryDto) {
     const data = await this.productService.findAll(query);
+    return { success: true, data };
+  }
+
+  @Get('ranking')
+  @ApiOperation({ summary: '판매량 TOP N 상품 랭킹 조회 (Redis Sorted Set)' })
+  @ApiResponse({ status: 200, description: '랭킹 목록 반환' })
+  async getTopRanking(
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
+  ) {
+    const safeLimit = Math.min(Math.max(limit, 1), 100);
+    const data = await this.productService.getTopRanking(safeLimit);
     return { success: true, data };
   }
 
