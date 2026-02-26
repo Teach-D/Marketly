@@ -78,10 +78,10 @@ export class OrderService {
         });
       }
 
-      await tx.cartItem.deleteMany({ where: { userId } });
-
       return order;
     });
+
+    await this.cartService.clearCart(userId);
 
     for (const cartItem of cartItems) {
       await this.redis.zIncrBy(REDIS_KEYS.SALES_RANKING, cartItem.quantity, cartItem.productId);

@@ -34,23 +34,23 @@ export class CartController {
 
   @Post()
   @ApiOperation({ summary: '장바구니에 상품 추가 (이미 있으면 수량 증가)' })
-  @ApiResponse({ status: 201, description: '추가/업데이트된 아이템 반환' })
+  @ApiResponse({ status: 201, description: '추가 성공' })
   async addItem(@CurrentUser() user: { id: string }, @Body() dto: AddCartItemDto) {
-    const data = await this.cartService.addItem(user.id, dto);
-    return { success: true, data };
+    await this.cartService.addItem(user.id, dto);
+    return { success: true, data: null };
   }
 
-  @Patch(':itemId')
+  @Patch(':productId')
   @ApiOperation({ summary: '장바구니 아이템 수량 변경' })
-  @ApiParam({ name: 'itemId', description: '장바구니 아이템 ID' })
-  @ApiResponse({ status: 200, description: '수정된 아이템 반환' })
+  @ApiParam({ name: 'productId', description: '상품 ID' })
+  @ApiResponse({ status: 200, description: '수정 성공' })
   async updateQuantity(
     @CurrentUser() user: { id: string },
-    @Param('itemId') itemId: string,
+    @Param('productId') productId: string,
     @Body() dto: UpdateCartItemDto,
   ) {
-    const data = await this.cartService.updateQuantity(user.id, itemId, dto);
-    return { success: true, data };
+    await this.cartService.updateQuantity(user.id, productId, dto);
+    return { success: true, data: null };
   }
 
   @Delete()
@@ -62,13 +62,13 @@ export class CartController {
     return { success: true, data: null };
   }
 
-  @Delete(':itemId')
+  @Delete(':productId')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '장바구니 아이템 단건 삭제' })
-  @ApiParam({ name: 'itemId', description: '장바구니 아이템 ID' })
+  @ApiParam({ name: 'productId', description: '상품 ID' })
   @ApiResponse({ status: 200, description: '삭제 성공' })
-  async removeItem(@CurrentUser() user: { id: string }, @Param('itemId') itemId: string) {
-    await this.cartService.removeItem(user.id, itemId);
+  async removeItem(@CurrentUser() user: { id: string }, @Param('productId') productId: string) {
+    await this.cartService.removeItem(user.id, productId);
     return { success: true, data: null };
   }
 }
