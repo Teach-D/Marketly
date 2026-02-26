@@ -37,7 +37,7 @@ export class ProductService {
 
     const where = {
       deletedAt: null,
-      ...(search && { name: { contains: search } }),
+      ...(search && { name: { search: this.formatSearchTerm(search) } }),
       ...(minRating !== undefined && { stat: { avgRating: { gte: minRating } } }),
     };
 
@@ -134,5 +134,14 @@ export class ProductService {
       this.redis.del(`product:${id}`),
       this.redis.delByPattern('products:list:*'),
     ]);
+  }
+
+  private formatSearchTerm(search: string): string {
+    return search
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((word) => `+${word}*`)
+      .join(' ');
   }
 }
