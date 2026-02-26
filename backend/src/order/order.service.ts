@@ -1,6 +1,7 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
+import { CouponService } from '../coupon/coupon.service';
 import { OrderStatus, VALID_TRANSITIONS } from './enums/order-status.enum';
 import { CartService } from '../cart/cart.service';
 import { Role } from '../common/enums/role.enum';
@@ -13,10 +14,11 @@ export class OrderService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    private readonly couponService: CouponService,
     private readonly cartService: CartService,
   ) {}
 
-  async createFromCart(userId: string) {
+  async createFromCart(userId: string, couponId?: string) {
     const cartItems = await this.cartService.findMyCart(userId);
     if (!cartItems.length) {
       throw new BusinessException(ErrorCode.CART_EMPTY, HttpStatus.BAD_REQUEST);
@@ -28,13 +30,25 @@ export class OrderService {
       }
     }
 
-    const totalPrice = cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+    const subtotal = cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+
+    let discountAmount = 0;
+    let userCouponId: string | undefined;
+    if (couponId) {
+      const coupon = await this.couponService.applyCoupon(userId, couponId, subtotal);
+      discountAmount = coupon.discountAmount;
+      userCouponId = coupon.userCouponId;
+    }
+
+    const totalPrice = subtotal - discountAmount;
 
     const result = await this.prisma.$transaction(async (tx) => {
       const order = await tx.order.create({
         data: {
           userId,
           totalPrice,
+          discountAmount,
+          couponId: couponId ?? null,
           status: OrderStatus.PAID,
           items: {
             create: cartItems.map((item) => ({
@@ -54,6 +68,13 @@ export class OrderService {
             stock: { decrement: cartItem.quantity },
             salesCount: { increment: cartItem.quantity },
           },
+        });
+      }
+
+      if (userCouponId) {
+        await tx.userCoupon.update({
+          where: { id: userCouponId },
+          data: { usedAt: new Date(), orderId: order.id },
         });
       }
 

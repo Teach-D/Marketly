@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   HttpCode,
@@ -10,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { OrderService } from './order.service';
+import { CreateOrderDto } from './dto/create-order.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../common/guards/admin.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -26,8 +28,8 @@ export class OrderController {
   @ApiOperation({ summary: '장바구니로 주문 생성' })
   @ApiResponse({ status: 201, description: '생성된 주문 반환' })
   @ApiResponse({ status: 400, description: '장바구니가 비어있음' })
-  async createFromCart(@CurrentUser() user: { id: string }) {
-    const data = await this.orderService.createFromCart(user.id);
+  async createFromCart(@CurrentUser() user: { id: string }, @Body() dto: CreateOrderDto) {
+    const data = await this.orderService.createFromCart(user.id, dto.couponId);
     return { success: true, data };
   }
 

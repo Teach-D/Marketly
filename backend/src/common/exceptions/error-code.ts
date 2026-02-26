@@ -15,6 +15,13 @@ export enum ErrorCode {
   REVIEW_FORBIDDEN = 'REVIEW_FORBIDDEN',
   REVIEW_ALREADY_EXISTS = 'REVIEW_ALREADY_EXISTS',
   REVIEW_PURCHASE_REQUIRED = 'REVIEW_PURCHASE_REQUIRED',
+  COUPON_NOT_FOUND = 'COUPON_NOT_FOUND',
+  COUPON_SOLD_OUT = 'COUPON_SOLD_OUT',
+  COUPON_ALREADY_ISSUED = 'COUPON_ALREADY_ISSUED',
+  COUPON_NOT_ISSUED = 'COUPON_NOT_ISSUED',
+  COUPON_ALREADY_USED = 'COUPON_ALREADY_USED',
+  COUPON_EXPIRED = 'COUPON_EXPIRED',
+  COUPON_MIN_ORDER_AMOUNT = 'COUPON_MIN_ORDER_AMOUNT',
 }
 
 export const ErrorMessage: Record<ErrorCode, string> = {
@@ -34,4 +41,11 @@ export const ErrorMessage: Record<ErrorCode, string> = {
   [ErrorCode.REVIEW_FORBIDDEN]: '리뷰에 대한 접근 권한이 없습니다.',
   [ErrorCode.REVIEW_ALREADY_EXISTS]: '이미 리뷰를 작성한 상품입니다.',
   [ErrorCode.REVIEW_PURCHASE_REQUIRED]: '배송완료된 주문이 있어야 리뷰를 작성할 수 있습니다.',
+  [ErrorCode.COUPON_NOT_FOUND]: '존재하지 않는 쿠폰입니다.',
+  [ErrorCode.COUPON_SOLD_OUT]: '쿠폰이 모두 소진되었습니다.',
+  [ErrorCode.COUPON_ALREADY_ISSUED]: '이미 발급받은 쿠폰입니다.',
+  [ErrorCode.COUPON_NOT_ISSUED]: '발급받지 않은 쿠폰입니다.',
+  [ErrorCode.COUPON_ALREADY_USED]: '이미 사용한 쿠폰입니다.',
+  [ErrorCode.COUPON_EXPIRED]: '유효기간이 지난 쿠폰입니다.',
+  [ErrorCode.COUPON_MIN_ORDER_AMOUNT]: '최소 주문 금액을 충족하지 않습니다.',
 };
