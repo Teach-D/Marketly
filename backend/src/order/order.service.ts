@@ -7,7 +7,8 @@ import { CartService } from '../cart/cart.service';
 import { Role } from '../common/enums/role.enum';
 import { BusinessException } from '../common/exceptions/business.exception';
 import { ErrorCode } from '../common/exceptions/error-code';
-import { REDIS_KEYS } from '../common/constants/redis-keys';
+import { REDIS_KEYS, STATS_DAILY_TTL, STATS_MONTHLY_TTL } from '../common/constants/redis-keys';
+import { toDateStr, toMonthStr } from '../common/utils/date.util';
 
 @Injectable()
 export class OrderService {
@@ -86,6 +87,9 @@ export class OrderService {
     for (const cartItem of cartItems) {
       await this.redis.zIncrBy(REDIS_KEYS.SALES_RANKING, cartItem.quantity, cartItem.productId);
     }
+
+    await this.updateRevenueStats(totalPrice);
+    await this.incrementOrderStats();
 
     return result;
   }
@@ -168,6 +172,24 @@ export class OrderService {
       where: { id: orderId },
       data: { status: OrderStatus.DELIVERED },
     });
+  }
+
+  private async updateRevenueStats(amount: number): Promise<void> {
+    const date = toDateStr(new Date());
+    const month = toMonthStr(new Date());
+    await Promise.all([
+      this.redis.incrByFloat(REDIS_KEYS.statsRevenueDaily(date), amount, STATS_DAILY_TTL),
+      this.redis.incrByFloat(REDIS_KEYS.statsRevenueMonthly(month), amount, STATS_MONTHLY_TTL),
+    ]);
+  }
+
+  private async incrementOrderStats(): Promise<void> {
+    const date = toDateStr(new Date());
+    const month = toMonthStr(new Date());
+    await Promise.all([
+      this.redis.incrBy(REDIS_KEYS.statsOrdersDaily(date), 1, STATS_DAILY_TTL),
+      this.redis.incrBy(REDIS_KEYS.statsOrdersMonthly(month), 1, STATS_MONTHLY_TTL),
+    ]);
   }
 
   private assertTransition(current: OrderStatus, next: OrderStatus) {

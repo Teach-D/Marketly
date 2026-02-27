@@ -9,6 +9,9 @@ import { ErrorCode } from '../common/exceptions/error-code';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
+import { RedisService } from '../redis/redis.service';
+import { REDIS_KEYS, STATS_DAILY_TTL, STATS_MONTHLY_TTL } from '../common/constants/redis-keys';
+import { toDateStr, toMonthStr } from '../common/utils/date.util';
 
 const SALT_ROUNDS = 10;
 
@@ -18,6 +21,7 @@ export class AuthService {
     private readonly userService: UserService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly redis: RedisService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -28,6 +32,14 @@ export class AuthService {
 
     const hashedPassword = await bcrypt.hash(dto.password, SALT_ROUNDS);
     const user = await this.userService.create(dto.email, hashedPassword);
+
+    const date = toDateStr(new Date());
+    const month = toMonthStr(new Date());
+    await Promise.all([
+      this.redis.incrBy(REDIS_KEYS.statsUsersDaily(date), 1, STATS_DAILY_TTL),
+      this.redis.incrBy(REDIS_KEYS.statsUsersMonthly(month), 1, STATS_MONTHLY_TTL),
+    ]);
+
     return { id: user.id, email: user.email };
   }
 
