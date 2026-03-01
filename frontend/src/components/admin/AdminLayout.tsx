@@ -4,6 +4,7 @@ const links = [
   { to: '/admin/products', label: '상품 관리' },
   { to: '/admin/orders', label: '주문 관리' },
   { to: '/admin/users', label: '회원 관리' },
+  { to: '/admin/coupons', label: '쿠폰 관리' },
 ];
 
 export default function AdminLayout() {

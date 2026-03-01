@@ -15,6 +15,8 @@ import OrderDetailPage from './pages/OrderDetailPage';
 import AdminProductsPage from './pages/admin/AdminProductsPage';
 import AdminOrdersPage from './pages/admin/AdminOrdersPage';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
+import AdminCouponsPage from './pages/admin/AdminCouponsPage';
+import CouponsPage from './pages/CouponsPage';
 
 const router = createBrowserRouter([
   {
@@ -32,6 +34,7 @@ const router = createBrowserRouter([
           { path: '/cart', element: <CartPage /> },
           { path: '/orders', element: <OrdersPage /> },
           { path: '/orders/:id', element: <OrderDetailPage /> },
+          { path: '/coupons', element: <CouponsPage /> },
         ],
       },
     ],
@@ -46,6 +49,7 @@ const router = createBrowserRouter([
           { path: '/admin/products', element: <AdminProductsPage /> },
           { path: '/admin/orders', element: <AdminOrdersPage /> },
           { path: '/admin/users', element: <AdminUsersPage /> },
+          { path: '/admin/coupons', element: <AdminCouponsPage /> },
         ],
       },
     ],

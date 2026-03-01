@@ -59,3 +59,24 @@ export interface Paginated<T> {
   page: number;
   limit: number;
 }
+
+export interface Coupon {
+  id: string;
+  name: string;
+  discountRate: number;
+  minOrderAmount: number;
+  maxIssueCount: number;
+  issuedCount: number;
+  validFrom: string;
+  validUntil: string;
+  createdAt: string;
+}
+
+export interface UserCoupon {
+  id: string;
+  userId: string;
+  couponId: string;
+  coupon: Coupon;
+  usedAt: string | null;
+  createdAt: string;
+}

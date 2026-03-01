@@ -51,6 +51,7 @@ export default function Navbar() {
               )}
             </Link>
             <Link to='/orders' style={linkStyle}>주문</Link>
+            <Link to='/coupons' style={linkStyle}>쿠폰</Link>
             <Link to='/my' style={linkStyle}>{user.email.split('@')[0]}</Link>
             {user.role === 'ADMIN' && (
               <Link to='/admin' style={{ ...linkStyle, color: '#f59e0b', fontWeight: 600 }}>관리자</Link>
