@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import apiClient from './axios';
-import type { ApiResponse, Coupon, UserCoupon } from '../types';
+import type { ApiResponse, Coupon, CouponEvent, UserCoupon } from '../types';
 import { useToastStore } from '../store/toast.store';
 
 interface CreateCouponDto {
@@ -8,6 +8,7 @@ interface CreateCouponDto {
   discountRate: number;
   minOrderAmount: number;
   maxIssueCount: number;
+  openAt: string;
   validFrom: string;
   validUntil: string;
 }
@@ -33,6 +34,14 @@ export const useCreateCoupon = () => {
   });
 };
 
+export const useCouponEvents = () =>
+  useQuery({
+    queryKey: ['coupons', 'events'],
+    queryFn: () =>
+      apiClient.get<ApiResponse<CouponEvent[]>>('/coupons/events').then((r) => r.data.data),
+    refetchInterval: 10_000,
+  });
+
 export const useMyCoupons = () =>
   useQuery({
     queryKey: ['coupons', 'my'],
@@ -52,7 +61,8 @@ export const useIssueCoupon = () => {
     },
     onError: (error: import('axios').AxiosError<ApiResponse<null>>) => {
       const code = error.response?.data?.error?.code;
-      if (code === 'COUPON_ALREADY_ISSUED') toast.push('이미 발급받은 쿠폰입니다.', 'error');
+      if (code === 'COUPON_NOT_OPEN') toast.push('아직 쿠폰 오픈 시간이 아닙니다.', 'error');
+      else if (code === 'COUPON_ALREADY_ISSUED') toast.push('이미 발급받은 쿠폰입니다.', 'error');
       else if (code === 'COUPON_SOLD_OUT') toast.push('쿠폰이 모두 소진되었습니다.', 'error');
       else toast.push('쿠폰 발급에 실패했습니다.', 'error');
     },

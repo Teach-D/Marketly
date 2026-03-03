@@ -8,6 +8,7 @@ interface CouponFormState {
   discountRate: string;
   minOrderAmount: string;
   maxIssueCount: string;
+  openAt: string;
   validFrom: string;
   validUntil: string;
 }
@@ -17,6 +18,7 @@ const emptyForm: CouponFormState = {
   discountRate: '',
   minOrderAmount: '0',
   maxIssueCount: '',
+  openAt: '',
   validFrom: '',
   validUntil: '',
 };
@@ -41,6 +43,7 @@ export default function AdminCouponsPage() {
         discountRate: Number(form.discountRate),
         minOrderAmount: Number(form.minOrderAmount),
         maxIssueCount: Number(form.maxIssueCount),
+        openAt: new Date(form.openAt).toISOString(),
         validFrom: new Date(form.validFrom).toISOString(),
         validUntil: new Date(form.validUntil).toISOString(),
       },
@@ -85,6 +88,10 @@ export default function AdminCouponsPage() {
               <label style={labelStyle}>총 발급 수량</label>
               <input name='maxIssueCount' type='number' min={1} value={form.maxIssueCount} onChange={handleChange} required style={inputStyle} placeholder='100' />
             </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={labelStyle}>쿠폰 오픈 시간 (이 시간 이후에만 발급 가능)</label>
+              <input name='openAt' type='datetime-local' value={form.openAt} onChange={handleChange} required style={inputStyle} />
+            </div>
             <div>
               <label style={labelStyle}>유효 시작일</label>
               <input name='validFrom' type='datetime-local' value={form.validFrom} onChange={handleChange} required style={inputStyle} />
@@ -104,17 +111,18 @@ export default function AdminCouponsPage() {
       <table style={tableStyle}>
         <thead>
           <tr style={{ background: '#f3f4f6' }}>
-            {['쿠폰 이름', '할인율', '최소주문금액', '발급현황', '유효기간', '쿠폰 ID'].map((h) => (
+            {['쿠폰 이름', '할인율', '최소주문금액', '발급현황', '오픈 시간', '유효기간', '쿠폰 ID'].map((h) => (
               <th key={h} style={thStyle}>{h}</th>
             ))}
           </tr>
         </thead>
         <tbody>
           {!coupons?.length ? (
-            <tr><td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>생성된 쿠폰이 없습니다.</td></tr>
+            <tr><td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>생성된 쿠폰이 없습니다.</td></tr>
           ) : (
             coupons.map((coupon) => <CouponRow key={coupon.id} coupon={coupon} copiedId={copiedId} onCopy={handleCopyId} />)
           )}
+
         </tbody>
       </table>
     </div>
@@ -122,7 +130,9 @@ export default function AdminCouponsPage() {
 }
 
 function CouponRow({ coupon, copiedId, onCopy }: { coupon: Coupon; copiedId: string | null; onCopy: (id: string) => void }) {
-  const isExpired = new Date() > new Date(coupon.validUntil);
+  const now = new Date();
+  const isExpired = now > new Date(coupon.validUntil);
+  const isOpen = now >= new Date(coupon.openAt);
   return (
     <tr style={{ borderBottom: '1px solid #e5e7eb', opacity: isExpired ? 0.5 : 1 }}>
       <td style={tdStyle}>
@@ -132,6 +142,10 @@ function CouponRow({ coupon, copiedId, onCopy }: { coupon: Coupon; copiedId: str
       <td style={tdStyle}>{coupon.discountRate}%</td>
       <td style={tdStyle}>{coupon.minOrderAmount > 0 ? `${coupon.minOrderAmount.toLocaleString()}원` : '없음'}</td>
       <td style={tdStyle}>{coupon.issuedCount} / {coupon.maxIssueCount}</td>
+      <td style={{ ...tdStyle, fontSize: '0.8rem' }}>
+        <div style={{ color: isOpen ? '#10b981' : '#f59e0b', fontWeight: 600 }}>{isOpen ? '오픈됨' : '오픈 예정'}</div>
+        <div>{new Date(coupon.openAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+      </td>
       <td style={{ ...tdStyle, fontSize: '0.8rem' }}>
         <div>{new Date(coupon.validFrom).toLocaleDateString('ko-KR')}</div>
         <div>~ {new Date(coupon.validUntil).toLocaleDateString('ko-KR')}</div>

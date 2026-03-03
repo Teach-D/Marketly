@@ -16,6 +16,7 @@ import AdminProductsPage from './pages/admin/AdminProductsPage';
 import AdminOrdersPage from './pages/admin/AdminOrdersPage';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
 import AdminCouponsPage from './pages/admin/AdminCouponsPage';
+import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import CouponsPage from './pages/CouponsPage';
 
 const router = createBrowserRouter([
@@ -45,7 +46,8 @@ const router = createBrowserRouter([
       {
         element: <AdminLayout />,
         children: [
-          { path: '/admin', element: <Navigate to='/admin/products' replace /> },
+          { path: '/admin', element: <Navigate to='/admin/dashboard' replace /> },
+          { path: '/admin/dashboard', element: <AdminDashboardPage /> },
           { path: '/admin/products', element: <AdminProductsPage /> },
           { path: '/admin/orders', element: <AdminOrdersPage /> },
           { path: '/admin/users', element: <AdminUsersPage /> },

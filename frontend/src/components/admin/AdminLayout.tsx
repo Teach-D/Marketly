@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom';
 
 const links = [
+  { to: '/admin/dashboard', label: '대시보드' },
   { to: '/admin/products', label: '상품 관리' },
   { to: '/admin/orders', label: '주문 관리' },
   { to: '/admin/users', label: '회원 관리' },

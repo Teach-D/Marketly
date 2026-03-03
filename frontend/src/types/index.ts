@@ -67,9 +67,14 @@ export interface Coupon {
   minOrderAmount: number;
   maxIssueCount: number;
   issuedCount: number;
+  openAt: string;
   validFrom: string;
   validUntil: string;
   createdAt: string;
+}
+
+export interface CouponEvent extends Coupon {
+  status: 'upcoming' | 'open' | 'sold_out';
 }
 
 export interface UserCoupon {

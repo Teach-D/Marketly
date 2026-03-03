@@ -12,6 +12,8 @@ export default defineConfig({
       '/carts': 'http://localhost:3000',
       '/orders': 'http://localhost:3000',
       '/reviews': 'http://localhost:3000',
+      '/coupons': 'http://localhost:3000',
+      '/admin/stats': 'http://localhost:3000',
     },
   },
 });
