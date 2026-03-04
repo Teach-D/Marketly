@@ -22,6 +22,10 @@ export class CreateCouponDto {
   @Min(1)
   maxIssueCount: number;
 
+  @ApiProperty({ example: '2026-06-01T10:00:00Z', description: '쿠폰 오픈 시간 — 이 시간 이후에만 발급 가능 (ISO 8601)' })
+  @IsDateString()
+  openAt: string;
+
   @ApiProperty({ example: '2026-03-01T00:00:00Z', description: '유효 시작일 (ISO 8601)' })
   @IsDateString()
   validFrom: string;

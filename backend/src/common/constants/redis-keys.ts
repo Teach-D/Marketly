@@ -5,6 +5,7 @@ export const REDIS_KEYS = {
   SALES_RANKING: 'ranking:products:sales',
   couponMax: (couponId: string) => `coupon:max:${couponId}`,
   couponIssued: (couponId: string) => `coupon:issued:${couponId}`,
+  couponOpenAt: (couponId: string) => `coupon:open_at:${couponId}`,
   cart: (userId: string) => `cart:${userId}`,
   statsRevenueDaily: (date: string) => `stats:revenue:daily:${date}`,
   statsRevenueMonthly: (month: string) => `stats:revenue:monthly:${month}`,

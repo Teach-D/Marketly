@@ -10,6 +10,8 @@ import type { Coupon, UserCoupon } from '@prisma/client';
 const COUPON_ISSUE_SCRIPT = `
 local maxCount = tonumber(redis.call('GET', KEYS[1]))
 if not maxCount then return -2 end
+local openAt = redis.call('GET', KEYS[3])
+if openAt and tonumber(ARGV[2]) < tonumber(openAt) then return -3 end
 local isAlreadyIssued = redis.call('SISMEMBER', KEYS[2], ARGV[1])
 if isAlreadyIssued == 1 then return -1 end
 local currentCount = redis.call('SCARD', KEYS[2])
@@ -31,11 +33,16 @@ export class CouponService {
     const coupon = await this.prisma.coupon.create({
       data: {
         ...dto,
+        openAt: new Date(dto.openAt),
         validFrom: new Date(dto.validFrom),
         validUntil: new Date(dto.validUntil),
       },
     });
-    await this.redis.setString(REDIS_KEYS.couponMax(coupon.id), String(coupon.maxIssueCount));
+    const openAtSec = Math.floor(coupon.openAt.getTime() / 1000);
+    await Promise.all([
+      this.redis.setString(REDIS_KEYS.couponMax(coupon.id), String(coupon.maxIssueCount)),
+      this.redis.setString(REDIS_KEYS.couponOpenAt(coupon.id), String(openAtSec)),
+    ]);
     return coupon;
   }
 
@@ -43,14 +50,35 @@ export class CouponService {
     return this.prisma.coupon.findMany({ orderBy: { createdAt: 'desc' } });
   }
 
+  async findEvents() {
+    const now = new Date();
+    const coupons = await this.prisma.coupon.findMany({
+      where: { validUntil: { gte: now } },
+      orderBy: { openAt: 'asc' },
+    });
+    return coupons.map((c) => ({
+      ...c,
+      status: this.resolveStatus(c, now),
+    }));
+  }
+
+  private resolveStatus(coupon: Coupon, now: Date): 'upcoming' | 'open' | 'sold_out' {
+    if (now < coupon.openAt) return 'upcoming';
+    if (coupon.issuedCount >= coupon.maxIssueCount) return 'sold_out';
+    return 'open';
+  }
+
   async issue(userId: string, couponId: string): Promise<UserCoupon> {
+    const nowSec = Math.floor(Date.now() / 1000);
     const result = await this.redis.evalScript(
       COUPON_ISSUE_SCRIPT,
-      [REDIS_KEYS.couponMax(couponId), REDIS_KEYS.couponIssued(couponId)],
-      [userId],
+      [REDIS_KEYS.couponMax(couponId), REDIS_KEYS.couponIssued(couponId), REDIS_KEYS.couponOpenAt(couponId)],
+      [userId, String(nowSec)],
     );
 
     switch (result) {
+      case -3:
+        throw new BusinessException(ErrorCode.COUPON_NOT_OPEN, HttpStatus.CONFLICT);
       case -1:
         throw new BusinessException(ErrorCode.COUPON_ALREADY_ISSUED, HttpStatus.CONFLICT);
       case 0:
@@ -65,6 +93,9 @@ export class CouponService {
   private async issueFromDb(userId: string, couponId: string): Promise<UserCoupon> {
     const coupon = await this.prisma.coupon.findUnique({ where: { id: couponId } });
     if (!coupon) throw new BusinessException(ErrorCode.COUPON_NOT_FOUND, HttpStatus.NOT_FOUND);
+    if (new Date() < coupon.openAt) {
+      throw new BusinessException(ErrorCode.COUPON_NOT_OPEN, HttpStatus.CONFLICT);
+    }
 
     return this.prisma.$transaction(async (tx) => {
       const existing = await tx.userCoupon.findUnique({

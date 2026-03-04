@@ -44,6 +44,14 @@ export class CouponController {
     return { success: true, data };
   }
 
+  @Get('events')
+  @ApiOperation({ summary: '쿠폰 이벤트 목록 (공개) — 오픈 예정/진행 중인 쿠폰 조회' })
+  @ApiResponse({ status: 200, description: '이벤트 쿠폰 목록 반환 (status: upcoming | open | sold_out)' })
+  async findEvents() {
+    const data = await this.couponService.findEvents();
+    return { success: true, data };
+  }
+
   @Get('my')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('access-token')

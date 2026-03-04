@@ -55,6 +55,21 @@ export class RedisService implements OnModuleDestroy {
     await this.client.expire(key, ttlSeconds);
   }
 
+  async incrByFloat(key: string, increment: number, ttlSeconds?: number): Promise<void> {
+    await this.client.incrbyfloat(key, increment);
+    if (ttlSeconds) await this.client.expire(key, ttlSeconds);
+  }
+
+  async incrBy(key: string, increment: number, ttlSeconds?: number): Promise<void> {
+    await this.client.incrby(key, increment);
+    if (ttlSeconds) await this.client.expire(key, ttlSeconds);
+  }
+
+  async mGet(keys: string[]): Promise<Array<string | null>> {
+    if (!keys.length) return [];
+    return this.client.mget(...keys);
+  }
+
   async setString(key: string, value: string, ttlSeconds?: number): Promise<void> {
     if (ttlSeconds) {
       await this.client.set(key, value, 'EX', ttlSeconds);

@@ -22,6 +22,7 @@ export enum ErrorCode {
   COUPON_ALREADY_USED = 'COUPON_ALREADY_USED',
   COUPON_EXPIRED = 'COUPON_EXPIRED',
   COUPON_MIN_ORDER_AMOUNT = 'COUPON_MIN_ORDER_AMOUNT',
+  COUPON_NOT_OPEN = 'COUPON_NOT_OPEN',
 }
 
 export const ErrorMessage: Record<ErrorCode, string> = {
@@ -48,4 +49,5 @@ export const ErrorMessage: Record<ErrorCode, string> = {
   [ErrorCode.COUPON_ALREADY_USED]: '이미 사용한 쿠폰입니다.',
   [ErrorCode.COUPON_EXPIRED]: '유효기간이 지난 쿠폰입니다.',
   [ErrorCode.COUPON_MIN_ORDER_AMOUNT]: '최소 주문 금액을 충족하지 않습니다.',
+  [ErrorCode.COUPON_NOT_OPEN]: '쿠폰 오픈 시간이 되지 않았습니다.',
 };
