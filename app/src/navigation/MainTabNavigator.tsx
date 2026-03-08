@@ -4,7 +4,7 @@ import { useCart } from '../api/cart.api';
 import { useMyCoupons } from '../api/coupon.api';
 import ProductsStackNavigator from './ProductsStackNavigator';
 import RankingScreen from '../screens/RankingScreen';
-import CartScreen from '../screens/CartScreen';
+import CartStackNavigator from './CartStackNavigator';
 import MyStackNavigator from './MyStackNavigator';
 import type { MainTabParamList } from './types';
 
@@ -13,7 +13,6 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 function CartTabIcon({ color }: { color: string }) {
   const { data: items } = useCart();
   const count = items?.length ?? 0;
-
   return (
     <View>
       <Text style={{ color, fontSize: 20 }}>🛒</Text>
@@ -29,7 +28,6 @@ function CartTabIcon({ color }: { color: string }) {
 function MyTabIcon({ color }: { color: string }) {
   const { data: coupons } = useMyCoupons();
   const count = coupons?.length ?? 0;
-
   return (
     <View>
       <Text style={{ color, fontSize: 20 }}>👤</Text>
@@ -71,12 +69,10 @@ export default function MainTabNavigator() {
       />
       <Tab.Screen
         name="CartTab"
-        component={CartScreen}
+        component={CartStackNavigator}
         options={{
           tabBarLabel: '장바구니',
           tabBarIcon: ({ color }) => <CartTabIcon color={color} />,
-          headerShown: true,
-          title: '장바구니',
         }}
       />
       <Tab.Screen

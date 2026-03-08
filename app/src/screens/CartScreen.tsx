@@ -1,7 +1,12 @@
 import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Toast from 'react-native-toast-message';
 import { useCart, useUpdateCartItem, useRemoveCartItem, useClearCart } from '../api/cart.api';
 import type { CartItem } from '../types/cart';
+import type { CartStackParamList } from '../navigation/types';
+
+type Nav = NativeStackNavigationProp<CartStackParamList, 'CartMain'>;
 
 function CartItemRow({
   item,
@@ -13,7 +18,7 @@ function CartItemRow({
   onRemove: () => void;
 }) {
   return (
-    <View className="bg-white rounded-xl p-4 mb-3 border border-gray-100">
+    <View className="bg-white border border-gray-100 rounded-xl p-4 mb-3">
       <View className="flex-row justify-between items-start">
         <Text className="text-base font-semibold text-gray-900 flex-1 mr-2" numberOfLines={1}>
           {item.product.name}
@@ -51,6 +56,7 @@ function CartItemRow({
 }
 
 export default function CartScreen() {
+  const navigation = useNavigation<Nav>();
   const { data: items, isLoading } = useCart();
   const { mutate: updateQty } = useUpdateCartItem();
   const { mutate: removeItem } = useRemoveCartItem();
@@ -126,7 +132,10 @@ export default function CartScreen() {
           <Text className="text-gray-600">합계</Text>
           <Text className="text-xl font-bold text-gray-900">{total.toLocaleString()}원</Text>
         </View>
-        <TouchableOpacity className="bg-blue-600 rounded-xl py-4 items-center">
+        <TouchableOpacity
+          className="bg-blue-600 rounded-xl py-4 items-center"
+          onPress={() => navigation.navigate('OrderCheckout')}
+        >
           <Text className="text-white font-bold text-base">주문하기</Text>
         </TouchableOpacity>
       </View>
