@@ -3,11 +3,21 @@ export type AuthStackParamList = {
   Register: undefined;
 };
 
+export type ProductsStackParamList = {
+  ProductList: undefined;
+  ProductDetail: { id: string };
+};
+
+export type MyStackParamList = {
+  CouponEvents: undefined;
+  MyCoupons: undefined;
+};
+
 export type MainTabParamList = {
-  Products: undefined;
-  Cart: undefined;
-  Orders: undefined;
-  My: undefined;
+  ProductsTab: undefined;
+  RankingTab: undefined;
+  CartTab: undefined;
+  MyTab: undefined;
 };
 
 export type RootStackParamList = {
