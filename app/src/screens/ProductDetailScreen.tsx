@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
-import { useRoute } from '@react-navigation/native';
+import { useRoute, useNavigation } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Toast from 'react-native-toast-message';
 import type { ProductsStackParamList } from '../navigation/types';
 import { useProduct } from '../api/product.api';
 import { useAddToCart } from '../api/cart.api';
+
+type Nav = NativeStackNavigationProp<ProductsStackParamList, 'ProductDetail'>;
 
 type Route = RouteProp<ProductsStackParamList, 'ProductDetail'>;
 
@@ -20,6 +23,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 export default function ProductDetailScreen() {
   const { params } = useRoute<Route>();
+  const navigation = useNavigation<Nav>();
   const { data: product, isLoading } = useProduct(params.id);
   const { mutate: addToCart, isPending } = useAddToCart();
   const [qty] = useState(1);
@@ -71,10 +75,18 @@ export default function ProductDetailScreen() {
           <InfoRow label="재고" value={`${product.stock}개`} />
           <InfoRow label="판매량" value={`${product.salesCount}개`} />
           {product.stat && (
-            <InfoRow
-              label="평균 평점"
-              value={`★ ${product.stat.avgRating.toFixed(1)} (${product.stat.reviewCount}개)`}
-            />
+            <>
+              <InfoRow
+                label="평균 평점"
+                value={`★ ${product.stat.avgRating.toFixed(1)} (${product.stat.reviewCount}개)`}
+              />
+              <TouchableOpacity
+                className="py-3"
+                onPress={() => navigation.navigate('ProductReviews', { productId: product.id })}
+              >
+                <Text className="text-blue-600 text-sm">리뷰 {product.stat.reviewCount}개 모두 보기 →</Text>
+              </TouchableOpacity>
+            </>
           )}
         </View>
       </ScrollView>

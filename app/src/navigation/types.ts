@@ -6,6 +6,13 @@ export type AuthStackParamList = {
 export type ProductsStackParamList = {
   ProductList: undefined;
   ProductDetail: { id: string };
+  ProductReviews: { productId: string };
+  WriteReview: {
+    productId: string;
+    reviewId?: string;
+    initialRating?: number;
+    initialContent?: string;
+  };
 };
 
 export type CartStackParamList = {
