@@ -31,12 +31,12 @@ export class User {
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 
-  @OneToMany('Order', 'user', { lazy: true })
-  orders: Promise<unknown[]>;
+  @OneToMany('Order', 'user')
+  orders: unknown[];
 
-  @OneToMany('Review', 'user', { lazy: true })
-  reviews: Promise<unknown[]>;
+  @OneToMany('Review', 'user')
+  reviews: unknown[];
 
-  @OneToMany('UserCoupon', 'user', { lazy: true })
-  userCoupons: Promise<unknown[]>;
+  @OneToMany('UserCoupon', 'user')
+  userCoupons: unknown[];
 }

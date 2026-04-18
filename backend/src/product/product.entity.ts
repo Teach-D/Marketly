@@ -40,12 +40,12 @@ export class Product {
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 
-  @OneToMany('OrderItem', 'product', { lazy: true })
-  orderItems: Promise<unknown[]>;
+  @OneToMany('OrderItem', 'product')
+  orderItems: unknown[];
 
-  @OneToMany('Review', 'product', { lazy: true })
-  reviews: Promise<unknown[]>;
+  @OneToMany('Review', 'product')
+  reviews: unknown[];
 
-  @OneToOne('ProductStat', 'product', { lazy: true })
-  stat: Promise<unknown>;
+  @OneToOne('ProductStat', 'product')
+  stat: unknown;
 }

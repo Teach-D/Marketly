@@ -30,15 +30,15 @@ export class UserCoupon {
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @ManyToOne('User', 'userCoupons', { lazy: true, onDelete: 'CASCADE' })
+  @ManyToOne('User', 'userCoupons', { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
-  user: Promise<unknown>;
+  user: unknown;
 
-  @ManyToOne('Coupon', 'userCoupons', { lazy: true, onDelete: 'CASCADE' })
+  @ManyToOne('Coupon', 'userCoupons', { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'coupon_id' })
-  coupon: Promise<unknown>;
+  coupon: unknown;
 
-  @OneToOne('Order', 'userCoupon', { lazy: true, nullable: true })
+  @OneToOne('Order', 'userCoupon', { nullable: true })
   @JoinColumn({ name: 'order_id' })
-  order: Promise<unknown>;
+  order: unknown;
 }

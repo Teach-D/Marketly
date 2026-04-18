@@ -31,11 +31,11 @@ export class OrderItem {
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 
-  @ManyToOne('Order', 'items', { lazy: true, onDelete: 'CASCADE' })
+  @ManyToOne('Order', 'items', { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'order_id' })
-  order: Promise<unknown>;
+  order: unknown;
 
-  @ManyToOne('Product', 'orderItems', { lazy: true, nullable: true })
+  @ManyToOne('Product', 'orderItems', { nullable: true })
   @JoinColumn({ name: 'product_id' })
-  product: Promise<unknown>;
+  product: unknown;
 }

@@ -42,9 +42,9 @@ export class Coupon {
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 
-  @OneToMany('UserCoupon', 'coupon', { lazy: true })
-  userCoupons: Promise<unknown[]>;
+  @OneToMany('UserCoupon', 'coupon')
+  userCoupons: unknown[];
 
-  @OneToMany('Order', 'coupon', { lazy: true })
-  orders: Promise<unknown[]>;
+  @OneToMany('Order', 'coupon')
+  orders: unknown[];
 }

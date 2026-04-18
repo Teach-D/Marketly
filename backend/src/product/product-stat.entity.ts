@@ -11,7 +11,7 @@ export class ProductStat {
   @Column({ name: 'avg_rating', type: 'double', default: 0 })
   avgRating: number;
 
-  @OneToOne('Product', 'stat', { lazy: true, onDelete: 'CASCADE' })
+  @OneToOne('Product', 'stat', { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'product_id' })
-  product: Promise<unknown>;
+  product: unknown;
 }

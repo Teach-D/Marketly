@@ -135,7 +135,7 @@ export class OrderService {
     const order = await this.findById(orderId, userId, role);
     this.assertTransition(order.status, OrderStatus.CANCELLED);
 
-    const items = (await order.items) as OrderItem[];
+    const items = order.items as OrderItem[];
 
     const cancelled = await this.dataSource.transaction(async (manager) => {
       for (const item of items) {

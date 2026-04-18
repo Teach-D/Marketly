@@ -37,17 +37,17 @@ export class Order {
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 
-  @ManyToOne('User', 'orders', { lazy: true, onDelete: 'CASCADE' })
+  @ManyToOne('User', 'orders', { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
-  user: Promise<unknown>;
+  user: unknown;
 
-  @ManyToOne('Coupon', 'orders', { lazy: true, nullable: true })
+  @ManyToOne('Coupon', 'orders', { nullable: true })
   @JoinColumn({ name: 'coupon_id' })
-  coupon: Promise<unknown>;
+  coupon: unknown;
 
-  @OneToMany('OrderItem', 'order', { lazy: true })
-  items: Promise<unknown[]>;
+  @OneToMany('OrderItem', 'order')
+  items: unknown[];
 
-  @OneToOne('UserCoupon', 'order', { lazy: true })
-  userCoupon: Promise<unknown>;
+  @OneToOne('UserCoupon', 'order')
+  userCoupon: unknown;
 }

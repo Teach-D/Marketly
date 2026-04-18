@@ -33,11 +33,11 @@ export class Review {
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 
-  @ManyToOne('Product', 'reviews', { lazy: true, onDelete: 'CASCADE' })
+  @ManyToOne('Product', 'reviews', { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'product_id' })
-  product: Promise<unknown>;
+  product: unknown;
 
-  @ManyToOne('User', 'reviews', { lazy: true, onDelete: 'CASCADE' })
+  @ManyToOne('User', 'reviews', { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
-  user: Promise<unknown>;
+  user: unknown;
 }
