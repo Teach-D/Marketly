@@ -1,5 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { RedisService } from '../redis/redis.service';
 import { AddCartItemDto } from './dto/add-cart-item.dto';
 import { UpdateCartItemDto } from './dto/update-cart-item.dto';
@@ -7,7 +8,7 @@ import { ProductService } from '../product/product.service';
 import { BusinessException } from '../common/exceptions/business.exception';
 import { ErrorCode } from '../common/exceptions/error-code';
 import { REDIS_KEYS } from '../common/constants/redis-keys';
-import type { Product } from '@prisma/client';
+import { Product } from '../product/product.entity';
 
 const CART_TTL = 60 * 60 * 24 * 7;
 
@@ -20,7 +21,7 @@ export interface CartItemResult {
 @Injectable()
 export class CartService {
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectRepository(Product) private readonly productRepository: Repository<Product>,
     private readonly redis: RedisService,
     private readonly productService: ProductService,
   ) {}
@@ -31,9 +32,10 @@ export class CartService {
     if (!entries.length) return [];
 
     const productIds = entries.map(([productId]) => productId);
-    const products = await this.prisma.product.findMany({
-      where: { id: { in: productIds }, deletedAt: null },
-    });
+    const products = await this.productRepository
+      .createQueryBuilder('product')
+      .where('product.id IN (:...ids)', { ids: productIds })
+      .getMany();
     const productMap = new Map(products.map((p) => [p.id, p]));
 
     return entries

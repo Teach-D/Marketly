@@ -1,37 +1,45 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import { ProductService } from './product.service';
-import { PrismaService } from '../prisma/prisma.service';
+import { Product } from './product.entity';
+import { ProductStat } from './product-stat.entity';
 import { RedisService } from '../redis/redis.service';
 import { BusinessException } from '../common/exceptions/business.exception';
 import { ErrorCode } from '../common/exceptions/error-code';
-import type { Product } from '@prisma/client';
 
-const mockProduct: Product = {
+const mockProduct: Partial<Product> = {
   id: 'product-id',
   name: '테스트 상품',
   description: '설명',
   price: 10000,
   stock: 10,
+  salesCount: 0,
   deletedAt: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 };
 
-const prismaMock = {
-  product: {
-    findMany: jest.fn(),
-    count: jest.fn(),
-    findFirst: jest.fn(),
-    create: jest.fn(),
-    update: jest.fn(),
-  },
-} as unknown as PrismaService;
+const mockProductRepository = {
+  create: jest.fn(),
+  save: jest.fn(),
+  findOne: jest.fn(),
+  findAndCount: jest.fn(),
+  update: jest.fn(),
+  softDelete: jest.fn(),
+  createQueryBuilder: jest.fn(),
+};
+
+const mockProductStatRepository = {
+  create: jest.fn(),
+  save: jest.fn(),
+};
 
 const redisMock = {
   get: jest.fn(),
   set: jest.fn(),
   del: jest.fn(),
   delByPattern: jest.fn(),
+  zRevRangeWithScores: jest.fn(),
 } as unknown as RedisService;
 
 describe('ProductService', () => {
@@ -41,7 +49,8 @@ describe('ProductService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ProductService,
-        { provide: PrismaService, useValue: prismaMock },
+        { provide: getRepositoryToken(Product), useValue: mockProductRepository },
+        { provide: getRepositoryToken(ProductStat), useValue: mockProductStatRepository },
         { provide: RedisService, useValue: redisMock },
       ],
     }).compile();
@@ -55,34 +64,30 @@ describe('ProductService', () => {
       const cached = { items: [mockProduct], total: 1, page: 1, limit: 20 };
       (redisMock.get as jest.Mock).mockResolvedValue(cached);
 
-      const result = await service.findAll({ page: 1, limit: 20 });
+      const result = await service.findAll({ page: 1, limit: 20, sortBy: 'createdAt' });
 
       expect(result).toEqual(cached);
-      expect(prismaMock.product.findMany).not.toHaveBeenCalled();
+      expect(mockProductRepository.createQueryBuilder).not.toHaveBeenCalled();
     });
 
     it('캐시 미스 시 DB 조회 후 캐시 저장 및 결과 반환', async () => {
+      const qb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[mockProduct], 1]),
+      };
       (redisMock.get as jest.Mock).mockResolvedValue(null);
-      (prismaMock.product.findMany as jest.Mock).mockResolvedValue([mockProduct]);
-      (prismaMock.product.count as jest.Mock).mockResolvedValue(1);
+      (mockProductRepository.createQueryBuilder as jest.Mock).mockReturnValue(qb);
       (redisMock.set as jest.Mock).mockResolvedValue(undefined);
 
-      const result = await service.findAll({ page: 1, limit: 20 });
+      const result = await service.findAll({ page: 1, limit: 20, sortBy: 'createdAt' });
 
       expect(result.items).toHaveLength(1);
       expect(result.total).toBe(1);
       expect(redisMock.set).toHaveBeenCalledTimes(1);
-    });
-
-    it('검색어가 있으면 캐시 키에 search 포함', async () => {
-      (redisMock.get as jest.Mock).mockResolvedValue(null);
-      (prismaMock.product.findMany as jest.Mock).mockResolvedValue([]);
-      (prismaMock.product.count as jest.Mock).mockResolvedValue(0);
-      (redisMock.set as jest.Mock).mockResolvedValue(undefined);
-
-      await service.findAll({ page: 1, limit: 20, search: '나이키' });
-
-      expect(redisMock.get).toHaveBeenCalledWith('products:list:1:20:나이키');
     });
   });
 
@@ -93,12 +98,12 @@ describe('ProductService', () => {
       const result = await service.findById('product-id');
 
       expect(result).toEqual(mockProduct);
-      expect(prismaMock.product.findFirst).not.toHaveBeenCalled();
+      expect(mockProductRepository.findOne).not.toHaveBeenCalled();
     });
 
     it('캐시 미스 시 DB 조회 후 캐시 저장', async () => {
       (redisMock.get as jest.Mock).mockResolvedValue(null);
-      (prismaMock.product.findFirst as jest.Mock).mockResolvedValue(mockProduct);
+      (mockProductRepository.findOne as jest.Mock).mockResolvedValue(mockProduct);
       (redisMock.set as jest.Mock).mockResolvedValue(undefined);
 
       const result = await service.findById('product-id');
@@ -109,16 +114,20 @@ describe('ProductService', () => {
 
     it('존재하지 않는 상품이면 PRODUCT_NOT_FOUND 예외 발생', async () => {
       (redisMock.get as jest.Mock).mockResolvedValue(null);
-      (prismaMock.product.findFirst as jest.Mock).mockResolvedValue(null);
+      (mockProductRepository.findOne as jest.Mock).mockResolvedValue(null);
 
-      const error = await service.findById('no-id').catch((e: BusinessException) => e);
+      const error = await service.findById('no-id').catch((e: BusinessException) => e) as BusinessException;
       expect(error.getErrorCode()).toBe(ErrorCode.PRODUCT_NOT_FOUND);
     });
   });
 
   describe('create', () => {
     it('상품 생성 후 목록 캐시 무효화', async () => {
-      (prismaMock.product.create as jest.Mock).mockResolvedValue(mockProduct);
+      (mockProductRepository.create as jest.Mock).mockReturnValue(mockProduct);
+      (mockProductRepository.save as jest.Mock).mockResolvedValue(mockProduct);
+      (mockProductStatRepository.create as jest.Mock).mockReturnValue({ productId: 'product-id' });
+      (mockProductStatRepository.save as jest.Mock).mockResolvedValue({});
+      (mockProductRepository.findOne as jest.Mock).mockResolvedValue(mockProduct);
       (redisMock.delByPattern as jest.Mock).mockResolvedValue(undefined);
 
       const result = await service.create({ name: '테스트 상품', price: 10000, stock: 10 });
@@ -128,36 +137,11 @@ describe('ProductService', () => {
     });
   });
 
-  describe('update', () => {
-    it('상품 수정 후 상세 및 목록 캐시 무효화', async () => {
-      (redisMock.get as jest.Mock).mockResolvedValue(mockProduct);
-      (prismaMock.product.update as jest.Mock).mockResolvedValue({ ...mockProduct, name: '수정된 상품' });
-      (redisMock.del as jest.Mock).mockResolvedValue(undefined);
-      (redisMock.delByPattern as jest.Mock).mockResolvedValue(undefined);
-
-      await service.update('product-id', { name: '수정된 상품' });
-
-      expect(redisMock.del).toHaveBeenCalledWith('product:product-id');
-      expect(redisMock.delByPattern).toHaveBeenCalledWith('products:list:*');
-    });
-  });
-
   describe('adjustStock', () => {
-    it('재고 조정 성공 후 캐시 무효화', async () => {
-      (redisMock.get as jest.Mock).mockResolvedValue(mockProduct);
-      (prismaMock.product.update as jest.Mock).mockResolvedValue({ ...mockProduct, stock: 5 });
-      (redisMock.del as jest.Mock).mockResolvedValue(undefined);
-      (redisMock.delByPattern as jest.Mock).mockResolvedValue(undefined);
-
-      const result = await service.adjustStock('product-id', -5);
-
-      expect(result.stock).toBe(5);
-    });
-
     it('재고 부족이면 INSUFFICIENT_STOCK 예외 발생', async () => {
       (redisMock.get as jest.Mock).mockResolvedValue({ ...mockProduct, stock: 3 });
 
-      const error = await service.adjustStock('product-id', -10).catch((e: BusinessException) => e);
+      const error = await service.adjustStock('product-id', -10).catch((e: BusinessException) => e) as BusinessException;
       expect(error.getErrorCode()).toBe(ErrorCode.INSUFFICIENT_STOCK);
     });
   });

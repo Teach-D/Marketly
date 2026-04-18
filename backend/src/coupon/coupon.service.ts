@@ -1,11 +1,13 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, DataSource, MoreThanOrEqual, IsNull } from 'typeorm';
 import { RedisService } from '../redis/redis.service';
 import { CreateCouponDto } from './dto/create-coupon.dto';
 import { BusinessException } from '../common/exceptions/business.exception';
 import { ErrorCode } from '../common/exceptions/error-code';
 import { REDIS_KEYS } from '../common/constants/redis-keys';
-import type { Coupon, UserCoupon } from '@prisma/client';
+import { Coupon } from './coupon.entity';
+import { UserCoupon } from './user-coupon.entity';
 
 const COUPON_ISSUE_SCRIPT = `
 local maxCount = tonumber(redis.call('GET', KEYS[1]))
@@ -25,19 +27,21 @@ export type UserCouponWithCoupon = UserCoupon & { coupon: Coupon };
 @Injectable()
 export class CouponService {
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectRepository(Coupon) private readonly couponRepository: Repository<Coupon>,
+    @InjectRepository(UserCoupon) private readonly userCouponRepository: Repository<UserCoupon>,
+    private readonly dataSource: DataSource,
     private readonly redis: RedisService,
   ) {}
 
   async create(dto: CreateCouponDto): Promise<Coupon> {
-    const coupon = await this.prisma.coupon.create({
-      data: {
+    const coupon = await this.couponRepository.save(
+      this.couponRepository.create({
         ...dto,
         openAt: new Date(dto.openAt),
         validFrom: new Date(dto.validFrom),
         validUntil: new Date(dto.validUntil),
-      },
-    });
+      }),
+    );
     const openAtSec = Math.floor(coupon.openAt.getTime() / 1000);
     await Promise.all([
       this.redis.setString(REDIS_KEYS.couponMax(coupon.id), String(coupon.maxIssueCount)),
@@ -46,15 +50,15 @@ export class CouponService {
     return coupon;
   }
 
-  async findAll(): Promise<Coupon[]> {
-    return this.prisma.coupon.findMany({ orderBy: { createdAt: 'desc' } });
+  findAll(): Promise<Coupon[]> {
+    return this.couponRepository.find({ order: { createdAt: 'DESC' } });
   }
 
   async findEvents() {
     const now = new Date();
-    const coupons = await this.prisma.coupon.findMany({
-      where: { validUntil: { gte: now } },
-      orderBy: { openAt: 'asc' },
+    const coupons = await this.couponRepository.find({
+      where: { validUntil: MoreThanOrEqual(now) },
+      order: { openAt: 'ASC' },
     });
     return coupons.map((c) => ({
       ...c,
@@ -86,41 +90,43 @@ export class CouponService {
       case -2:
         return this.issueFromDb(userId, couponId);
       default:
-        return this.prisma.userCoupon.create({ data: { userId, couponId } });
+        return this.userCouponRepository.save(
+          this.userCouponRepository.create({ userId, couponId }),
+        );
     }
   }
 
   private async issueFromDb(userId: string, couponId: string): Promise<UserCoupon> {
-    const coupon = await this.prisma.coupon.findUnique({ where: { id: couponId } });
+    const coupon = await this.couponRepository.findOne({ where: { id: couponId } });
     if (!coupon) throw new BusinessException(ErrorCode.COUPON_NOT_FOUND, HttpStatus.NOT_FOUND);
     if (new Date() < coupon.openAt) {
       throw new BusinessException(ErrorCode.COUPON_NOT_OPEN, HttpStatus.CONFLICT);
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const existing = await tx.userCoupon.findUnique({
-        where: { userId_couponId: { userId, couponId } },
-      });
+    return this.dataSource.transaction(async (manager) => {
+      const existing = await manager.findOne(UserCoupon, { where: { userId, couponId } });
       if (existing) throw new BusinessException(ErrorCode.COUPON_ALREADY_ISSUED, HttpStatus.CONFLICT);
 
-      const updated = await tx.coupon.updateMany({
-        where: { id: couponId, issuedCount: { lt: coupon.maxIssueCount } },
-        data: { issuedCount: { increment: 1 } },
-      });
-      if (updated.count === 0) {
+      const result = await manager
+        .createQueryBuilder()
+        .update(Coupon)
+        .set({ issuedCount: () => 'issued_count + 1' })
+        .where('id = :id AND issued_count < :max', { id: couponId, max: coupon.maxIssueCount })
+        .execute();
+      if (result.affected === 0) {
         throw new BusinessException(ErrorCode.COUPON_SOLD_OUT, HttpStatus.CONFLICT);
       }
 
-      return tx.userCoupon.create({ data: { userId, couponId } });
+      return manager.save(UserCoupon, manager.create(UserCoupon, { userId, couponId }));
     });
   }
 
   async findMyCoupons(userId: string): Promise<UserCouponWithCoupon[]> {
-    return this.prisma.userCoupon.findMany({
-      where: { userId, usedAt: null },
-      include: { coupon: true },
-      orderBy: { createdAt: 'desc' },
-    });
+    return this.userCouponRepository.find({
+      where: { userId, usedAt: IsNull() },
+      relations: ['coupon'],
+      order: { createdAt: 'DESC' },
+    }) as Promise<UserCouponWithCoupon[]>;
   }
 
   async applyCoupon(
@@ -128,10 +134,10 @@ export class CouponService {
     couponId: string,
     orderAmount: number,
   ): Promise<{ discountAmount: number; userCouponId: string }> {
-    const userCoupon = await this.prisma.userCoupon.findUnique({
-      where: { userId_couponId: { userId, couponId } },
-      include: { coupon: true },
-    });
+    const userCoupon = await this.userCouponRepository.findOne({
+      where: { userId, couponId },
+      relations: ['coupon'],
+    }) as UserCouponWithCoupon | null;
     if (!userCoupon) throw new BusinessException(ErrorCode.COUPON_NOT_ISSUED, HttpStatus.BAD_REQUEST);
     if (userCoupon.usedAt) throw new BusinessException(ErrorCode.COUPON_ALREADY_USED, HttpStatus.CONFLICT);
 

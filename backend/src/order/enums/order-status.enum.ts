@@ -1,6 +1,9 @@
-import { OrderStatus } from '@prisma/client';
-
-export { OrderStatus };
+export enum OrderStatus {
+  PAID = 'PAID',
+  SHIPPING = 'SHIPPING',
+  DELIVERED = 'DELIVERED',
+  CANCELLED = 'CANCELLED',
+}
 
 export const VALID_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.PAID]: [OrderStatus.SHIPPING, OrderStatus.CANCELLED],

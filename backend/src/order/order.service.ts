@@ -1,5 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { RedisService } from '../redis/redis.service';
 import { CouponService } from '../coupon/coupon.service';
 import { OrderStatus, VALID_TRANSITIONS } from './enums/order-status.enum';
@@ -9,11 +10,19 @@ import { BusinessException } from '../common/exceptions/business.exception';
 import { ErrorCode } from '../common/exceptions/error-code';
 import { REDIS_KEYS, STATS_DAILY_TTL, STATS_MONTHLY_TTL } from '../common/constants/redis-keys';
 import { toDateStr, toMonthStr } from '../common/utils/date.util';
+import { Order } from './order.entity';
+import { OrderItem } from './order-item.entity';
+import { Product } from '../product/product.entity';
+import { UserCoupon } from '../coupon/user-coupon.entity';
 
 @Injectable()
 export class OrderService {
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectRepository(Order) private readonly orderRepository: Repository<Order>,
+    @InjectRepository(OrderItem) private readonly orderItemRepository: Repository<OrderItem>,
+    @InjectRepository(Product) private readonly productRepository: Repository<Product>,
+    @InjectRepository(UserCoupon) private readonly userCouponRepository: Repository<UserCoupon>,
+    private readonly dataSource: DataSource,
     private readonly redis: RedisService,
     private readonly couponService: CouponService,
     private readonly cartService: CartService,
@@ -43,43 +52,44 @@ export class OrderService {
 
     const totalPrice = subtotal - discountAmount;
 
-    const result = await this.prisma.$transaction(async (tx) => {
-      const order = await tx.order.create({
-        data: {
+    const result = await this.dataSource.transaction(async (manager) => {
+      const savedOrder = await manager.save(
+        Order,
+        manager.create(Order, {
           userId,
           totalPrice,
           discountAmount,
           couponId: couponId ?? null,
           status: OrderStatus.PAID,
-          items: {
-            create: cartItems.map((item) => ({
-              productId: item.productId,
-              quantity: item.quantity,
-              price: item.product.price,
-            })),
-          },
-        },
-        include: { items: { include: { product: true } } },
-      });
+        }),
+      );
+
+      const items = cartItems.map((item) =>
+        manager.create(OrderItem, {
+          orderId: savedOrder.id,
+          productId: item.productId,
+          quantity: item.quantity,
+          price: item.product.price,
+        }),
+      );
+      await manager.save(OrderItem, items);
 
       for (const cartItem of cartItems) {
-        await tx.product.update({
-          where: { id: cartItem.productId },
-          data: {
-            stock: { decrement: cartItem.quantity },
-            salesCount: { increment: cartItem.quantity },
-          },
-        });
+        await manager.decrement(Product, { id: cartItem.productId }, 'stock', cartItem.quantity);
+        await manager.increment(Product, { id: cartItem.productId }, 'salesCount', cartItem.quantity);
       }
 
       if (userCouponId) {
-        await tx.userCoupon.update({
-          where: { id: userCouponId },
-          data: { usedAt: new Date(), orderId: order.id },
+        await manager.update(UserCoupon, { id: userCouponId }, {
+          usedAt: new Date(),
+          orderId: savedOrder.id,
         });
       }
 
-      return order;
+      return manager.findOne(Order, {
+        where: { id: savedOrder.id },
+        relations: ['items', 'items.product'],
+      });
     });
 
     await this.cartService.clearCart(userId);
@@ -94,25 +104,25 @@ export class OrderService {
     return result;
   }
 
-  async findMyOrders(userId: string) {
-    return this.prisma.order.findMany({
+  findMyOrders(userId: string) {
+    return this.orderRepository.find({
       where: { userId },
-      include: { items: { include: { product: true } } },
-      orderBy: { createdAt: 'desc' },
+      relations: ['items', 'items.product'],
+      order: { createdAt: 'DESC' },
     });
   }
 
-  async findAllOrders() {
-    return this.prisma.order.findMany({
-      include: { items: { include: { product: true } } },
-      orderBy: { createdAt: 'desc' },
+  findAllOrders() {
+    return this.orderRepository.find({
+      relations: ['items', 'items.product'],
+      order: { createdAt: 'DESC' },
     });
   }
 
   async findById(orderId: string, userId: string, role: Role) {
-    const order = await this.prisma.order.findUnique({
+    const order = await this.orderRepository.findOne({
       where: { id: orderId },
-      include: { items: { include: { product: true } } },
+      relations: ['items', 'items.product'],
     });
     if (!order) throw new BusinessException(ErrorCode.ORDER_NOT_FOUND, HttpStatus.NOT_FOUND);
     if (role !== Role.ADMIN && order.userId !== userId) {
@@ -125,27 +135,25 @@ export class OrderService {
     const order = await this.findById(orderId, userId, role);
     this.assertTransition(order.status, OrderStatus.CANCELLED);
 
-    const cancelled = await this.prisma.$transaction(async (tx) => {
-      for (const item of order.items) {
+    const items = (await order.items) as OrderItem[];
+
+    const cancelled = await this.dataSource.transaction(async (manager) => {
+      for (const item of items) {
         if (item.productId) {
-          await tx.product.update({
-            where: { id: item.productId },
-            data: {
-              stock: { increment: item.quantity },
-              salesCount: { decrement: item.quantity },
-            },
-          });
+          await manager.increment(Product, { id: item.productId }, 'stock', item.quantity);
+          await manager.decrement(Product, { id: item.productId }, 'salesCount', item.quantity);
         }
       }
 
-      return tx.order.update({
+      await manager.update(Order, { id: orderId }, { status: OrderStatus.CANCELLED });
+
+      return manager.findOne(Order, {
         where: { id: orderId },
-        data: { status: OrderStatus.CANCELLED },
-        include: { items: { include: { product: true } } },
+        relations: ['items', 'items.product'],
       });
     });
 
-    for (const item of order.items) {
+    for (const item of items) {
       if (item.productId) {
         await this.redis.zIncrBy(REDIS_KEYS.SALES_RANKING, -item.quantity, item.productId);
       }
@@ -155,23 +163,19 @@ export class OrderService {
   }
 
   async ship(orderId: string) {
-    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    const order = await this.orderRepository.findOne({ where: { id: orderId } });
     if (!order) throw new BusinessException(ErrorCode.ORDER_NOT_FOUND, HttpStatus.NOT_FOUND);
     this.assertTransition(order.status, OrderStatus.SHIPPING);
-    return this.prisma.order.update({
-      where: { id: orderId },
-      data: { status: OrderStatus.SHIPPING },
-    });
+    await this.orderRepository.update(orderId, { status: OrderStatus.SHIPPING });
+    return this.orderRepository.findOne({ where: { id: orderId } });
   }
 
   async deliver(orderId: string) {
-    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    const order = await this.orderRepository.findOne({ where: { id: orderId } });
     if (!order) throw new BusinessException(ErrorCode.ORDER_NOT_FOUND, HttpStatus.NOT_FOUND);
     this.assertTransition(order.status, OrderStatus.DELIVERED);
-    return this.prisma.order.update({
-      where: { id: orderId },
-      data: { status: OrderStatus.DELIVERED },
-    });
+    await this.orderRepository.update(orderId, { status: OrderStatus.DELIVERED });
+    return this.orderRepository.findOne({ where: { id: orderId } });
   }
 
   private async updateRevenueStats(amount: number): Promise<void> {

@@ -10,6 +10,8 @@ jest.mock('bcrypt', () => ({
 
 import * as bcrypt from 'bcrypt';
 import { UserService } from '../user/user.service';
+import { RedisService } from '../redis/redis.service';
+import { User } from '../user/user.entity';
 import { BusinessException } from '../common/exceptions/business.exception';
 import { ErrorCode } from '../common/exceptions/error-code';
 import { Role } from '../common/enums/role.enum';
@@ -22,7 +24,10 @@ const mockUser = {
   refreshToken: null,
   createdAt: new Date(),
   updatedAt: new Date(),
-};
+  orders: Promise.resolve([]),
+  reviews: Promise.resolve([]),
+  userCoupons: Promise.resolve([]),
+} as unknown as User;
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -55,6 +60,12 @@ describe('AuthService', () => {
             get: jest.fn().mockReturnValue('15m'),
           },
         },
+        {
+          provide: RedisService,
+          useValue: {
+            incrBy: jest.fn().mockResolvedValue(1),
+          },
+        },
       ],
     }).compile();
 
@@ -79,7 +90,7 @@ describe('AuthService', () => {
 
       const error = await service
         .register({ email: mockUser.email, password: 'password123' })
-        .catch((e: BusinessException) => e);
+        .catch((e: BusinessException) => e) as BusinessException;
       expect(error.getErrorCode()).toBe(ErrorCode.USER_ALREADY_EXISTS);
     });
   });
@@ -102,7 +113,7 @@ describe('AuthService', () => {
 
       const error = await service
         .login({ email: 'none@example.com', password: 'password123' })
-        .catch((e: BusinessException) => e);
+        .catch((e: BusinessException) => e) as BusinessException;
       expect(error.getErrorCode()).toBe(ErrorCode.INVALID_CREDENTIALS);
     });
 
@@ -112,7 +123,7 @@ describe('AuthService', () => {
 
       const error = await service
         .login({ email: mockUser.email, password: 'wrong-password' })
-        .catch((e: BusinessException) => e);
+        .catch((e: BusinessException) => e) as BusinessException;
       expect(error.getErrorCode()).toBe(ErrorCode.INVALID_CREDENTIALS);
     });
   });
@@ -145,7 +156,7 @@ describe('AuthService', () => {
 
       const error = await service
         .refresh('user-id', 'test@example.com', 'raw-token')
-        .catch((e: BusinessException) => e);
+        .catch((e: BusinessException) => e) as BusinessException;
       expect(error.getErrorCode()).toBe(ErrorCode.INVALID_TOKEN);
     });
 
@@ -155,7 +166,7 @@ describe('AuthService', () => {
 
       const error = await service
         .refresh('user-id', 'test@example.com', 'wrong-token')
-        .catch((e: BusinessException) => e);
+        .catch((e: BusinessException) => e) as BusinessException;
       expect(error.getErrorCode()).toBe(ErrorCode.INVALID_TOKEN);
     });
   });

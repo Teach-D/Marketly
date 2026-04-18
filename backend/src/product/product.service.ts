@@ -1,5 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { RedisService } from '../redis/redis.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -7,9 +8,12 @@ import { ProductQueryDto } from './dto/product-query.dto';
 import { BusinessException } from '../common/exceptions/business.exception';
 import { ErrorCode } from '../common/exceptions/error-code';
 import { REDIS_KEYS } from '../common/constants/redis-keys';
-import type { Product, ProductStat } from '@prisma/client';
+import { Product } from './product.entity';
+import { ProductStat } from './product-stat.entity';
 
-export type ProductWithStat = Product & { stat: ProductStat | null };
+export type ProductWithStat = Omit<Product, 'stat' | 'orderItems' | 'reviews'> & {
+  stat: ProductStat | null;
+};
 
 const PRODUCT_DETAIL_TTL = 300;
 const PRODUCT_LIST_TTL = 60;
@@ -24,7 +28,8 @@ export interface ProductListResult {
 @Injectable()
 export class ProductService {
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectRepository(Product) private readonly productRepository: Repository<Product>,
+    @InjectRepository(ProductStat) private readonly productStatRepository: Repository<ProductStat>,
     private readonly redis: RedisService,
   ) {}
 
@@ -35,24 +40,24 @@ export class ProductService {
     const cached = await this.redis.get<ProductListResult>(cacheKey);
     if (cached) return cached;
 
-    const where = {
-      deletedAt: null,
-      ...(search && { name: { search: this.formatSearchTerm(search) } }),
-      ...(minRating !== undefined && { stat: { avgRating: { gte: minRating } } }),
-    };
+    const qb = this.productRepository
+      .createQueryBuilder('product')
+      .leftJoinAndSelect('product.stat', 'stat')
+      .orderBy(`product.${sortBy}`, 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
 
-    const [items, total] = await Promise.all([
-      this.prisma.product.findMany({
-        where,
-        include: { stat: true },
-        orderBy: { [sortBy]: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      this.prisma.product.count({ where }),
-    ]);
+    if (search) {
+      qb.andWhere('MATCH(product.name) AGAINST (:search IN BOOLEAN MODE)', {
+        search: this.formatSearchTerm(search),
+      });
+    }
+    if (minRating !== undefined) {
+      qb.andWhere('stat.avgRating >= :minRating', { minRating });
+    }
 
-    const result = { items, total, page, limit };
+    const [items, total] = await qb.getManyAndCount();
+    const result = { items, total, page, limit } as unknown as ProductListResult;
     await this.redis.set(cacheKey, result, PRODUCT_LIST_TTL);
     return result;
   }
@@ -63,10 +68,10 @@ export class ProductService {
     const cached = await this.redis.get<ProductWithStat>(cacheKey);
     if (cached) return cached;
 
-    const product = await this.prisma.product.findFirst({
-      where: { id, deletedAt: null },
-      include: { stat: true },
-    });
+    const product = await this.productRepository.findOne({
+      where: { id },
+      relations: ['stat'],
+    }) as unknown as ProductWithStat | null;
     if (!product) throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND, HttpStatus.NOT_FOUND);
 
     await this.redis.set(cacheKey, product, PRODUCT_DETAIL_TTL);
@@ -74,27 +79,26 @@ export class ProductService {
   }
 
   async create(dto: CreateProductDto) {
-    const product = await this.prisma.product.create({
-      data: {
-        ...dto,
-        stat: { create: {} },
-      },
-      include: { stat: true },
-    });
+    const product = await this.productRepository.save(this.productRepository.create(dto));
+    await this.productStatRepository.save(this.productStatRepository.create({ productId: product.id }));
+    const result = await this.productRepository.findOne({
+      where: { id: product.id },
+      relations: ['stat'],
+    }) as unknown as ProductWithStat;
     await this.redis.delByPattern('products:list:*');
-    return product;
+    return result;
   }
 
   async update(id: string, dto: UpdateProductDto) {
     await this.findById(id);
-    const product = await this.prisma.product.update({ where: { id }, data: dto });
+    await this.productRepository.update(id, dto);
     await this.invalidateProduct(id);
-    return product;
+    return this.productRepository.findOne({ where: { id } });
   }
 
   async remove(id: string) {
     await this.findById(id);
-    await this.prisma.product.update({ where: { id }, data: { deletedAt: new Date() } });
+    await this.productRepository.softDelete(id);
     await this.invalidateProduct(id);
   }
 
@@ -104,9 +108,9 @@ export class ProductService {
     if (newStock < 0) {
       throw new BusinessException(ErrorCode.INSUFFICIENT_STOCK, HttpStatus.CONFLICT);
     }
-    const updated = await this.prisma.product.update({ where: { id }, data: { stock: newStock } });
+    await this.productRepository.update(id, { stock: newStock });
     await this.invalidateProduct(id);
-    return updated;
+    return this.productRepository.findOne({ where: { id } });
   }
 
   async getTopRanking(limit: number) {
@@ -114,10 +118,11 @@ export class ProductService {
     if (!entries.length) return [];
 
     const ids = entries.map((e) => e.member);
-    const products = await this.prisma.product.findMany({
-      where: { id: { in: ids }, deletedAt: null },
-      include: { stat: true },
-    });
+    const products = await this.productRepository
+      .createQueryBuilder('product')
+      .leftJoinAndSelect('product.stat', 'stat')
+      .where('product.id IN (:...ids)', { ids })
+      .getMany() as unknown as ProductWithStat[];
 
     const productMap = new Map(products.map((p) => [p.id, p]));
     return entries
