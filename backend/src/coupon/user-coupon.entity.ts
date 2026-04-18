@@ -21,7 +21,7 @@ export class UserCoupon {
   @Column({ name: 'coupon_id' })
   couponId: string;
 
-  @Column({ name: 'used_at', nullable: true, default: null })
+  @Column({ name: 'used_at', type: 'datetime', nullable: true, default: null })
   usedAt: Date | null;
 
   @Column({ name: 'order_id', nullable: true, unique: true, default: null })
